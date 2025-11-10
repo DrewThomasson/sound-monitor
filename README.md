@@ -15,6 +15,7 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 ### Sound Detection & Logging
 - **Real-time Decibel Monitoring**: Tracks sound levels continuously
 - **Intelligent Event Detection**: Automatically identifies and flags sounds above threshold
+- **Extended Event Clips**: Records 2 seconds before and after events for full context (4+ seconds minimum)
 - **Comprehensive Logging**: Stores timestamp, duration, peak dB, average dB, and file reference for each event
 - **SQLite Database**: Fast, efficient storage for quick searches and analysis
 - **Low-Frequency Detection**: Specifically identifies low-frequency noise like car rumble (20-200 Hz)
@@ -29,9 +30,10 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 
 ### Logs & Playback
 - **Event Log Table**: View all recorded events in a sortable table
+- **Analytics Tab**: Visual charts showing events over time, dB distribution, hourly patterns, and frequency types
 - **Smart Filtering**: Filter events by minimum decibel level
 - **Sort by Any Column**: Click headers to sort by timestamp, duration, or dB level
-- **Audio Playback**: Double-click any event to play the recorded audio
+- **Audio Playback**: Double-click any event to play the recorded audio (includes pre/post buffers)
 - **CSV Export**: Export logs for presentations or further analysis
 
 ### Statistics & Monitoring
@@ -39,7 +41,7 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 - **Low-Frequency Event Count**: Track rumbling vehicles separately
 - **Storage Information**: Monitor disk usage and estimated recording capacity
 - **System Status**: Battery and resource monitoring for outdoor deployment
-- **Extreme Event Notifications**: Pop-up alerts for exceptionally loud sounds
+- **Non-Intrusive Notifications**: Visual notification panel for extreme events (no popups!)
 
 ## Installation
 
