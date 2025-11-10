@@ -1,0 +1,16 @@
+[Unit]
+Description=Sound Monitor - Noise Detection and Recording
+After=sound.target pulseaudio.service
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/sound-monitor
+ExecStart=/usr/bin/python3 /home/YOUR_USERNAME/sound-monitor/sound_monitor.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=append:/home/YOUR_USERNAME/sound-monitor/monitor.log
+StandardError=append:/home/YOUR_USERNAME/sound-monitor/monitor.log
+
+[Install]
+WantedBy=default.target

@@ -101,9 +101,37 @@ python3 sound_monitor.py
 # Press Ctrl+A then D to detach
 ```
 
+### Running as a System Service (Advanced)
+
+For automatic startup on boot:
+
+```bash
+# 1. Edit sound-monitor.service and replace YOUR_USERNAME with your actual username
+# 2. Copy service file to systemd directory
+sudo cp sound-monitor.service /etc/systemd/system/
+
+# 3. Reload systemd
+sudo systemctl daemon-reload
+
+# 4. Enable and start the service
+sudo systemctl enable sound-monitor.service
+sudo systemctl start sound-monitor.service
+
+# 5. Check status
+sudo systemctl status sound-monitor.service
+
+# 6. View logs
+journalctl -u sound-monitor.service -f
+```
+
 ### Stopping the Monitor
 
 Press `Ctrl+C` to stop monitoring gracefully.
+
+For systemd service:
+```bash
+sudo systemctl stop sound-monitor.service
+```
 
 ## Output Files
 

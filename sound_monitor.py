@@ -244,8 +244,42 @@ class SoundMonitor:
 
 def main():
     """Main entry point."""
-    monitor = SoundMonitor()
-    monitor.monitor()
+    import argparse
+    
+    parser = argparse.ArgumentParser(
+        description='Sound Monitor - Professional Noise Detection and Recording System',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python3 sound_monitor.py              # Run with default config.json
+  python3 sound_monitor.py --config custom.json  # Use custom config
+
+For more information, see README.md and QUICKSTART.md
+        """
+    )
+    
+    parser.add_argument(
+        '--config',
+        default='config.json',
+        help='Path to configuration file (default: config.json)'
+    )
+    
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='Sound Monitor 1.0.0'
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        monitor = SoundMonitor(config_path=args.config)
+        monitor.monitor()
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    except Exception as e:
+        print(f"Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == '__main__':
