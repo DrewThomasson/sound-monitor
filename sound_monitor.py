@@ -883,10 +883,11 @@ class SoundMonitorApp(QMainWindow):
             # Parse data
             from datetime import datetime as dt
             timestamps = [dt.strptime(e[0], "%Y-%m-%d %H:%M:%S.%f") for e in events]
-            durations = [e[1] for e in events]
-            peak_dbs = [e[2] for e in events]
-            avg_dbs = [e[3] for e in events]
-            low_freq = [e[4] for e in events]
+            durations = [float(e[1]) for e in events]
+            peak_dbs = [float(e[2]) for e in events]
+            avg_dbs = [float(e[3]) for e in events]
+            # Convert low_frequency to int (handle both int and boolean types from SQLite)
+            low_freq = [int(e[4]) if e[4] is not None else 0 for e in events]
             
             # Clear previous plots
             self.analytics_figure.clear()
