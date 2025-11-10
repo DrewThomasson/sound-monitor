@@ -72,6 +72,12 @@ class AudioProcessor(QObject):
         self.event_peak_db = 0
         self.event_samples = []
         
+        # Ring buffer for pre-event context (2 seconds before event)
+        self.pre_event_buffer_seconds = 2
+        self.post_event_buffer_seconds = 2
+        self.audio_ring_buffer = []
+        self.max_ring_buffer_samples = int(self.pre_event_buffer_seconds * RATE / CHUNK)
+        
         # Create recordings directory
         Path(RECORDINGS_DIR).mkdir(exist_ok=True)
         
@@ -324,6 +330,8 @@ class AudioProcessor(QObject):
     
     def _record_loop(self):
         """Main recording loop (runs in separate thread)"""
+        post_event_counter = 0
+        
         while self.recording:
             try:
                 # Read audio data
@@ -339,6 +347,11 @@ class AudioProcessor(QObject):
                 # Add to current segment
                 self.current_segment.append(data)
                 
+                # Maintain ring buffer for pre-event context
+                self.audio_ring_buffer.append(data)
+                if len(self.audio_ring_buffer) > self.max_ring_buffer_samples:
+                    self.audio_ring_buffer.pop(0)
+                
                 # Check if we've recorded enough for a segment (using device sample rate)
                 if len(self.current_segment) * CHUNK >= self.device_sample_rate * RECORD_SECONDS:
                     # Save segment
@@ -353,19 +366,31 @@ class AudioProcessor(QObject):
                 # Event detection
                 if db_level >= self.threshold_db:
                     if not self.event_in_progress:
-                        # Start new event
+                        # Start new event - include pre-event buffer
                         self.event_in_progress = True
                         self.event_start_time = datetime.now()
                         self.event_peak_db = db_level
-                        self.event_samples = [data]
+                        # Include audio from ring buffer for context
+                        self.event_samples = list(self.audio_ring_buffer) + [data]
                     else:
                         # Continue event
                         self.event_peak_db = max(self.event_peak_db, db_level)
                         self.event_samples.append(data)
+                    # Reset post-event counter
+                    post_event_counter = 0
                 else:
                     if self.event_in_progress:
-                        # Event ended
-                        self._finalize_event()
+                        # Continue collecting audio for post-event buffer
+                        post_event_counter += 1
+                        self.event_samples.append(data)
+                        
+                        # Check if we've collected enough post-event samples
+                        post_event_samples_needed = int(self.post_event_buffer_seconds * self.device_sample_rate / CHUNK)
+                        if post_event_counter >= post_event_samples_needed:
+                            # Event ended (with buffer)
+                            self._finalize_event()
+                            post_event_counter = 0
+                
                 
             except Exception as e:
                 if self.recording:  # Only emit error if still supposed to be recording
@@ -641,6 +666,7 @@ class SoundMonitorApp(QMainWindow):
         super().__init__()
         self.audio_processor = AudioProcessor()
         self.last_audio_data = None
+        self.extreme_event_notifications = []  # Track recent notifications
         
         # Connect signals
         self.audio_processor.level_updated.connect(self.on_level_updated)
@@ -665,6 +691,17 @@ class SoundMonitorApp(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
         
+        # Notification panel for extreme events
+        self.notification_panel = QLabel("")
+        self.notification_panel.setStyleSheet(
+            "background-color: #ffcccc; color: #cc0000; padding: 10px; "
+            "font-weight: bold; font-size: 12pt; border: 2px solid #cc0000;"
+        )
+        self.notification_panel.setWordWrap(True)
+        self.notification_panel.setAlignment(Qt.AlignCenter)
+        self.notification_panel.hide()  # Hidden by default
+        main_layout.addWidget(self.notification_panel)
+        
         # Control panel
         control_panel = self.create_control_panel()
         main_layout.addWidget(control_panel)
@@ -679,6 +716,10 @@ class SoundMonitorApp(QMainWindow):
         # Event log tab
         log_tab = self.create_log_tab()
         tabs.addTab(log_tab, "Event Log")
+        
+        # Analytics tab (NEW)
+        analytics_tab = self.create_analytics_tab()
+        tabs.addTab(analytics_tab, "Analytics")
         
         # Statistics tab
         stats_tab = self.create_statistics_tab()
@@ -791,6 +832,118 @@ class SoundMonitorApp(QMainWindow):
         
         widget.setLayout(layout)
         return widget
+    
+    def create_analytics_tab(self):
+        """Create the analytics tab with graphs and visualizations"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+        
+        # Refresh button at top
+        refresh_layout = QHBoxLayout()
+        refresh_button = QPushButton("Refresh Charts")
+        refresh_button.clicked.connect(self.update_analytics)
+        refresh_layout.addWidget(refresh_button)
+        refresh_layout.addStretch()
+        layout.addLayout(refresh_layout)
+        
+        # Create matplotlib figure with subplots
+        from matplotlib.figure import Figure
+        self.analytics_figure = Figure(figsize=(12, 8))
+        self.analytics_canvas = FigureCanvas(self.analytics_figure)
+        layout.addWidget(self.analytics_canvas)
+        
+        # Initial update
+        self.update_analytics()
+        
+        widget.setLayout(layout)
+        return widget
+    
+    def update_analytics(self):
+        """Update analytics charts with event data"""
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            
+            # Get all events
+            c.execute('''SELECT timestamp, duration, peak_db, avg_db, low_frequency 
+                         FROM events 
+                         ORDER BY timestamp''')
+            events = c.fetchall()
+            conn.close()
+            
+            if not events:
+                # No data yet
+                self.analytics_figure.clear()
+                ax = self.analytics_figure.add_subplot(111)
+                ax.text(0.5, 0.5, 'No event data available yet.\nStart recording to see analytics.',
+                       ha='center', va='center', fontsize=14)
+                self.analytics_canvas.draw()
+                return
+            
+            # Parse data
+            from datetime import datetime as dt
+            timestamps = [dt.strptime(e[0], "%Y-%m-%d %H:%M:%S.%f") for e in events]
+            durations = [e[1] for e in events]
+            peak_dbs = [e[2] for e in events]
+            avg_dbs = [e[3] for e in events]
+            low_freq = [e[4] for e in events]
+            
+            # Clear previous plots
+            self.analytics_figure.clear()
+            
+            # Create 4 subplots
+            ax1 = self.analytics_figure.add_subplot(2, 2, 1)
+            ax2 = self.analytics_figure.add_subplot(2, 2, 2)
+            ax3 = self.analytics_figure.add_subplot(2, 2, 3)
+            ax4 = self.analytics_figure.add_subplot(2, 2, 4)
+            
+            # Plot 1: Events over time (scatter with size = duration)
+            ax1.scatter(timestamps, peak_dbs, s=[d*20 for d in durations], alpha=0.6, c=peak_dbs, cmap='YlOrRd')
+            ax1.set_xlabel('Time')
+            ax1.set_ylabel('Peak dB')
+            ax1.set_title('Noise Events Over Time\n(bubble size = duration)')
+            ax1.grid(True, alpha=0.3)
+            ax1.tick_params(axis='x', rotation=45)
+            
+            # Plot 2: dB Level Distribution (histogram)
+            ax2.hist(peak_dbs, bins=20, color='orange', alpha=0.7, edgecolor='black')
+            ax2.set_xlabel('Peak dB Level')
+            ax2.set_ylabel('Number of Events')
+            ax2.set_title('Distribution of Noise Levels')
+            ax2.grid(True, alpha=0.3, axis='y')
+            ax2.axvline(np.mean(peak_dbs), color='red', linestyle='--', linewidth=2, label=f'Mean: {np.mean(peak_dbs):.1f} dB')
+            ax2.legend()
+            
+            # Plot 3: Events by hour of day
+            hours = [t.hour for t in timestamps]
+            hour_counts = [hours.count(h) for h in range(24)]
+            ax3.bar(range(24), hour_counts, color='steelblue', alpha=0.7, edgecolor='black')
+            ax3.set_xlabel('Hour of Day')
+            ax3.set_ylabel('Number of Events')
+            ax3.set_title('Noise Events by Hour of Day')
+            ax3.set_xticks(range(0, 24, 2))
+            ax3.grid(True, alpha=0.3, axis='y')
+            
+            # Plot 4: Low frequency vs Normal frequency
+            low_freq_count = sum(low_freq)
+            normal_freq_count = len(low_freq) - low_freq_count
+            ax4.pie([normal_freq_count, low_freq_count], 
+                   labels=['Normal Frequency', 'Low Frequency\n(Vehicle Rumble)'],
+                   autopct='%1.1f%%',
+                   colors=['lightblue', 'darkred'],
+                   startangle=90)
+            ax4.set_title('Frequency Distribution of Events')
+            
+            self.analytics_figure.tight_layout()
+            self.analytics_canvas.draw()
+            
+        except Exception as e:
+            # Error handling
+            self.analytics_figure.clear()
+            ax = self.analytics_figure.add_subplot(111)
+            ax.text(0.5, 0.5, f'Error loading analytics:\n{str(e)}',
+                   ha='center', va='center', fontsize=12, color='red')
+            self.analytics_canvas.draw()
     
     def create_statistics_tab(self):
         """Create the statistics tab"""
@@ -986,15 +1139,46 @@ class SoundMonitorApp(QMainWindow):
         # Update statistics
         self.statistics_widget.update_statistics()
         
-        # Show notification for extreme events
+        # Update analytics chart
+        self.update_analytics()
+        
+        # Show notification for extreme events (in panel, not popup)
         if event_data['peak_db'] >= self.audio_processor.threshold_db + 10:
-            QMessageBox.information(
-                self, 
-                "Extreme Noise Detected",
-                f"Peak level: {event_data['peak_db']:.1f} dB\n"
-                f"Duration: {event_data['duration']:.2f} seconds\n"
-                f"Time: {event_data['timestamp']}"
+            # Add to notification list
+            timestamp = event_data['timestamp']
+            self.extreme_event_notifications.append({
+                'time': timestamp,
+                'db': event_data['peak_db'],
+                'duration': event_data['duration']
+            })
+            
+            # Keep only last 5 notifications
+            if len(self.extreme_event_notifications) > 5:
+                self.extreme_event_notifications.pop(0)
+            
+            # Update notification panel
+            notification_text = "⚠️ EXTREME NOISE ALERTS:\n"
+            for notif in reversed(self.extreme_event_notifications):
+                notification_text += f"🔊 {notif['db']:.1f} dB at {notif['time']} ({notif['duration']:.1f}s)\n"
+            
+            self.notification_panel.setText(notification_text.strip())
+            self.notification_panel.show()
+            
+            # Auto-hide after 30 seconds
+            QTimer.singleShot(30000, self.hide_notification_panel)
+    
+    def hide_notification_panel(self):
+        """Hide the notification panel"""
+        if len(self.extreme_event_notifications) > 0:
+            # If there are still notifications, update the panel but make it less prominent
+            notification_text = f"⚠️ Recent extreme events: {len(self.extreme_event_notifications)} (Last: {self.extreme_event_notifications[-1]['db']:.1f} dB)"
+            self.notification_panel.setText(notification_text)
+            self.notification_panel.setStyleSheet(
+                "background-color: #fff3cd; color: #856404; padding: 5px; "
+                "font-weight: normal; font-size: 10pt; border: 1px solid #ffc107;"
             )
+        else:
+            self.notification_panel.hide()
     
     def on_status_updated(self, message):
         """Handle status update"""
