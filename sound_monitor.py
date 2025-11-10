@@ -886,8 +886,21 @@ class SoundMonitorApp(QMainWindow):
             durations = [float(e[1]) for e in events]
             peak_dbs = [float(e[2]) for e in events]
             avg_dbs = [float(e[3]) for e in events]
-            # Convert low_frequency to int (handle both int and boolean types from SQLite)
-            low_freq = [int(e[4]) if e[4] is not None else 0 for e in events]
+            
+            # Convert low_frequency to int (handle int, bool, bytes, and None types from SQLite)
+            def safe_bool_to_int(value):
+                """Safely convert various boolean representations to int"""
+                if value is None:
+                    return 0
+                if isinstance(value, bytes):
+                    # Bytes like b'\x00' (False) or b'\x01' (True)
+                    return 1 if value and value != b'\x00' else 0
+                if isinstance(value, (int, bool)):
+                    return int(value)
+                # String representation
+                return 1 if str(value).lower() in ('1', 'true', 'yes') else 0
+            
+            low_freq = [safe_bool_to_int(e[4]) for e in events]
             
             # Clear previous plots
             self.analytics_figure.clear()
