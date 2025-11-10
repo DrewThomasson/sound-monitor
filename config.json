@@ -1,0 +1,10 @@
+{
+    "threshold_db": 70,
+    "sample_rate": 44100,
+    "chunk_size": 1024,
+    "channels": 1,
+    "recording_duration": 10,
+    "reference_db": 90,
+    "output_dir": "recordings",
+    "log_file": "sound_events.csv"
+}
