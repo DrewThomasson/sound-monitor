@@ -912,11 +912,15 @@ class SoundMonitorApp(QMainWindow):
             ax4 = self.analytics_figure.add_subplot(2, 2, 4)
             
             # Plot 1: Events over time (scatter with size = duration)
+            # Format x-axis with AM/PM time
+            import matplotlib.dates as mdates
             ax1.scatter(timestamps, peak_dbs, s=[d*20 for d in durations], alpha=0.6, c=peak_dbs, cmap='YlOrRd')
-            ax1.set_xlabel('Time')
+            ax1.set_xlabel('Time (EST/EDT)')
             ax1.set_ylabel('Peak dB')
             ax1.set_title('Noise Events Over Time\n(bubble size = duration)')
             ax1.grid(True, alpha=0.3)
+            # Format x-axis to show dates and times in 12-hour format
+            ax1.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d\n%I:%M %p'))
             ax1.tick_params(axis='x', rotation=45)
             
             # Plot 2: dB Level Distribution (histogram)
@@ -928,14 +932,29 @@ class SoundMonitorApp(QMainWindow):
             ax2.axvline(np.mean(peak_dbs), color='red', linestyle='--', linewidth=2, label=f'Mean: {np.mean(peak_dbs):.1f} dB')
             ax2.legend()
             
-            # Plot 3: Events by hour of day
+            # Plot 3: Events by hour of day (12-hour format with AM/PM)
             hours = [t.hour for t in timestamps]
             hour_counts = [hours.count(h) for h in range(24)]
+            
+            # Create 12-hour labels with AM/PM
+            hour_labels = []
+            for h in range(24):
+                if h == 0:
+                    hour_labels.append('12 AM')
+                elif h < 12:
+                    hour_labels.append(f'{h} AM')
+                elif h == 12:
+                    hour_labels.append('12 PM')
+                else:
+                    hour_labels.append(f'{h-12} PM')
+            
             ax3.bar(range(24), hour_counts, color='steelblue', alpha=0.7, edgecolor='black')
-            ax3.set_xlabel('Hour of Day')
+            ax3.set_xlabel('Hour of Day (EST/EDT)')
             ax3.set_ylabel('Number of Events')
             ax3.set_title('Noise Events by Hour of Day')
+            # Set x-ticks to show every 2 hours in 12-hour format
             ax3.set_xticks(range(0, 24, 2))
+            ax3.set_xticklabels([hour_labels[i] for i in range(0, 24, 2)], rotation=45, ha='right')
             ax3.grid(True, alpha=0.3, axis='y')
             
             # Plot 4: Low frequency vs Normal frequency
