@@ -22,6 +22,13 @@ try:
 except ImportError:
     PYAUDIO_AVAILABLE = False
     pyaudio = None
+
+try:
+    import cv2
+    CV2_AVAILABLE = True
+except ImportError:
+    CV2_AVAILABLE = False
+    cv2 = None
     
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -30,7 +37,7 @@ from PyQt5.QtWidgets import (
     QGridLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QTextEdit
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject
-from PyQt5.QtGui import QPalette, QColor
+from PyQt5.QtGui import QPalette, QColor, QImage, QPixmap
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from pydub import AudioSegment
@@ -46,6 +53,13 @@ RECORD_SECONDS = 60  # Record in 1-minute segments
 MP3_BITRATE = "64k"  # Low bitrate for storage efficiency
 DB_FILE = "sound_events.db"
 RECORDINGS_DIR = "recordings"
+VIDEOS_DIR = "videos"  # Directory for video recordings
+
+# Video settings (optimized for storage and CPU)
+VIDEO_WIDTH = 640  # 640x480 is efficient
+VIDEO_HEIGHT = 480
+VIDEO_FPS = 10  # Low FPS to save storage/CPU
+VIDEO_CODEC = 'mp4v'  # Compatible codec
 
 
 class AudioProcessor(QObject):
@@ -78,8 +92,15 @@ class AudioProcessor(QObject):
         self.audio_ring_buffer = []
         self.max_ring_buffer_samples = int(self.pre_event_buffer_seconds * RATE / CHUNK)
         
-        # Create recordings directory
+        # Video recording attributes
+        self.video_enabled = False
+        self.camera_index = 0
+        self.video_writer = None
+        self.video_event_filename = None
+        
+        # Create recordings and videos directories
         Path(RECORDINGS_DIR).mkdir(exist_ok=True)
+        Path(VIDEOS_DIR).mkdir(exist_ok=True)
         
         # Initialize database
         self.init_database()
@@ -95,6 +116,7 @@ class AudioProcessor(QObject):
                       peak_db REAL,
                       avg_db REAL,
                       filename TEXT,
+                      video_filename TEXT,
                       low_frequency BOOLEAN)''')
         conn.commit()
         conn.close()
@@ -113,6 +135,92 @@ class AudioProcessor(QObject):
             if info['maxInputChannels'] > 0:
                 devices.append((i, info['name']))
         return devices
+    
+    def get_camera_devices(self):
+        """Get list of available camera devices"""
+        if not CV2_AVAILABLE:
+            return []
+        
+        cameras = []
+        # Try first 10 possible camera indices
+        for i in range(10):
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                cameras.append((i, f"Camera {i}"))
+                cap.release()
+        return cameras
+    
+    def set_camera(self, camera_index):
+        """Set the camera device to use for video recording"""
+        self.camera_index = camera_index
+    
+    def set_video_enabled(self, enabled):
+        """Enable or disable video recording"""
+        self.video_enabled = enabled and CV2_AVAILABLE
+    
+    def start_video_recording(self, event_timestamp):
+        """Start recording video for an event"""
+        if not self.video_enabled or not CV2_AVAILABLE:
+            return None
+        
+        try:
+            cap = cv2.VideoCapture(self.camera_index)
+            if not cap.isOpened():
+                self.error_occurred.emit(f"Cannot open camera {self.camera_index}")
+                return None
+            
+            # Set camera properties
+            cap.set(cv2.CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH)
+            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT)
+            cap.set(cv2.CAP_PROP_FPS, VIDEO_FPS)
+            
+            # Create video filename
+            video_filename = os.path.join(VIDEOS_DIR, f"event_{event_timestamp}.mp4")
+            
+            # Initialize video writer
+            fourcc = cv2.VideoWriter_fourcc(*VIDEO_CODEC)
+            out = cv2.VideoWriter(video_filename, fourcc, VIDEO_FPS, (VIDEO_WIDTH, VIDEO_HEIGHT))
+            
+            self.video_writer = out
+            self.video_event_filename = video_filename
+            self.video_capture = cap
+            
+            return video_filename
+        except Exception as e:
+            self.error_occurred.emit(f"Error starting video recording: {str(e)}")
+            return None
+    
+    def write_video_frame(self):
+        """Capture and write a single video frame"""
+        if self.video_writer is None or not hasattr(self, 'video_capture'):
+            return
+        
+        try:
+            ret, frame = self.video_capture.read()
+            if ret:
+                self.video_writer.write(frame)
+        except Exception as e:
+            self.error_occurred.emit(f"Error writing video frame: {str(e)}")
+    
+    def stop_video_recording(self):
+        """Stop recording video and cleanup"""
+        if self.video_writer is not None:
+            try:
+                self.video_writer.release()
+            except:
+                pass
+            self.video_writer = None
+        
+        if hasattr(self, 'video_capture'):
+            try:
+                self.video_capture.release()
+            except:
+                pass
+            delattr(self, 'video_capture')
+        
+        filename = self.video_event_filename
+        self.video_event_filename = None
+        return filename
     
     def detect_sample_rate(self, device_index):
         """Detect the best supported sample rate for a device"""
@@ -237,15 +345,15 @@ class AudioProcessor(QObject):
             self.error_occurred.emit(f"Error saving audio: {str(e)}")
             return None
     
-    def log_event(self, timestamp, duration, peak_db, avg_db, filename, low_freq):
+    def log_event(self, timestamp, duration, peak_db, avg_db, filename, video_filename, low_freq):
         """Log an event to the database"""
         try:
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
             c.execute('''INSERT INTO events 
-                         (timestamp, duration, peak_db, avg_db, filename, low_frequency)
-                         VALUES (?, ?, ?, ?, ?, ?)''',
-                      (timestamp, duration, peak_db, avg_db, filename, low_freq))
+                         (timestamp, duration, peak_db, avg_db, filename, video_filename, low_frequency)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                      (timestamp, duration, peak_db, avg_db, filename, video_filename, low_freq))
             conn.commit()
             conn.close()
             
@@ -256,6 +364,7 @@ class AudioProcessor(QObject):
                 'peak_db': peak_db,
                 'avg_db': avg_db,
                 'filename': filename,
+                'video_filename': video_filename,
                 'low_frequency': low_freq
             })
         except Exception as e:
@@ -372,15 +481,28 @@ class AudioProcessor(QObject):
                         self.event_peak_db = db_level
                         # Include audio from ring buffer for context
                         self.event_samples = list(self.audio_ring_buffer) + [data]
+                        
+                        # Start video recording if enabled
+                        if self.video_enabled:
+                            timestamp = self.event_start_time.strftime("%Y%m%d_%H%M%S_%f")
+                            self.start_video_recording(timestamp)
                     else:
                         # Continue event
                         self.event_peak_db = max(self.event_peak_db, db_level)
                         self.event_samples.append(data)
+                        
+                        # Write video frame if recording
+                        if self.video_writer is not None:
+                            self.write_video_frame()
                     # Reset post-event counter
                     post_event_counter = 0
                 else:
                     if self.event_in_progress:
                         # Continue collecting audio for post-event buffer
+                        
+                        # Continue writing video frames during post-event buffer
+                        if self.video_writer is not None:
+                            self.write_video_frame()
                         post_event_counter += 1
                         self.event_samples.append(data)
                         
@@ -405,10 +527,21 @@ class AudioProcessor(QObject):
         event_end_time = datetime.now()
         duration = (event_end_time - self.event_start_time).total_seconds()
         
+        # Stop video recording if active
+        video_filename = None
+        if self.video_writer is not None:
+            video_filename = self.stop_video_recording()
+        
         # Only log events longer than 0.1 seconds
         if duration < 0.1:
             self.event_in_progress = False
             self.event_samples = []
+            # Clean up video file if created
+            if video_filename and os.path.exists(video_filename):
+                try:
+                    os.remove(video_filename)
+                except:
+                    pass
             return
         
         # Calculate average dB
@@ -431,6 +564,7 @@ class AudioProcessor(QObject):
                 self.event_peak_db,
                 avg_db,
                 filename,
+                video_filename,
                 low_freq
             )
             
@@ -518,12 +652,13 @@ class EventLogTable(QTableWidget):
     """Table widget for displaying logged events"""
     
     play_requested = pyqtSignal(str)  # filename to play
+    play_video_requested = pyqtSignal(str)  # video filename to play
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setColumnCount(6)
+        self.setColumnCount(7)
         self.setHorizontalHeaderLabels([
-            'Timestamp', 'Duration (s)', 'Peak dB', 'Avg dB', 'Low Freq', 'Filename'
+            'Timestamp', 'Duration (s)', 'Peak dB', 'Avg dB', 'Low Freq', 'Filename', 'Video'
         ])
         self.setSortingEnabled(True)
         self.setSelectionBehavior(QTableWidget.SelectRows)
@@ -533,7 +668,16 @@ class EventLogTable(QTableWidget):
         self.cellDoubleClicked.connect(self._on_double_click)
         
     def _on_double_click(self, row, col):
-        """Handle double-click to play audio"""
+        """Handle double-click to play audio or video"""
+        # If video column clicked and video exists, play video
+        if col == 6:
+            video_item = self.item(row, 6)
+            if video_item and video_item.data(Qt.UserRole):
+                video_filename = video_item.data(Qt.UserRole)
+                self.play_video_requested.emit(video_filename)
+                return
+        
+        # Otherwise play audio
         filename_item = self.item(row, 5)
         if filename_item:
             self.play_requested.emit(filename_item.text())
@@ -546,13 +690,13 @@ class EventLogTable(QTableWidget):
             
             if filter_min_db is not None:
                 c.execute('''SELECT timestamp, duration, peak_db, avg_db, 
-                             low_frequency, filename 
+                             low_frequency, filename, video_filename 
                              FROM events 
                              WHERE peak_db >= ?
                              ORDER BY timestamp DESC''', (filter_min_db,))
             else:
                 c.execute('''SELECT timestamp, duration, peak_db, avg_db,
-                             low_frequency, filename 
+                             low_frequency, filename, video_filename 
                              FROM events 
                              ORDER BY timestamp DESC''')
             
@@ -567,6 +711,13 @@ class EventLogTable(QTableWidget):
                 self.setItem(i, 3, QTableWidgetItem(f"{row[3]:.1f}"))
                 self.setItem(i, 4, QTableWidgetItem("Yes" if row[4] else "No"))
                 self.setItem(i, 5, QTableWidgetItem(row[5]))
+                # Store video filename as item data for later retrieval
+                if len(row) > 6 and row[6]:
+                    video_item = QTableWidgetItem("📹 Yes")
+                    video_item.setData(Qt.UserRole, row[6])  # Store video filename
+                else:
+                    video_item = QTableWidgetItem("No")
+                self.setItem(i, 6, video_item)
             
             self.resizeColumnsToContents()
             
@@ -657,6 +808,89 @@ class StatisticsWidget(QWidget):
             
         except Exception as e:
             pass
+
+
+class CameraPreviewWidget(QLabel):
+    """Widget for displaying live camera preview"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.camera_index = 0
+        self.capture = None
+        self.timer = None
+        self.setMinimumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
+        self.setMaximumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
+        self.setScaledContents(True)
+        self.setStyleSheet("QLabel { background-color: black; border: 2px solid gray; }")
+        self.setText("No Camera")
+        self.setAlignment(Qt.AlignCenter)
+    
+    def start_preview(self, camera_index=0):
+        """Start camera preview"""
+        if not CV2_AVAILABLE:
+            self.setText("OpenCV not available")
+            return
+        
+        self.camera_index = camera_index
+        
+        # Stop existing capture if any
+        self.stop_preview()
+        
+        # Start new capture
+        try:
+            self.capture = cv2.VideoCapture(camera_index)
+            if not self.capture.isOpened():
+                self.setText(f"Cannot open camera {camera_index}")
+                return
+            
+            # Set camera properties
+            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH)
+            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT)
+            
+            # Start timer to update frames
+            self.timer = QTimer(self)
+            self.timer.timeout.connect(self.update_frame)
+            self.timer.start(int(1000 / VIDEO_FPS))  # Update at VIDEO_FPS
+        except Exception as e:
+            self.setText(f"Error: {str(e)}")
+    
+    def update_frame(self):
+        """Update the displayed frame"""
+        if self.capture is None or not self.capture.isOpened():
+            return
+        
+        try:
+            ret, frame = self.capture.read()
+            if ret:
+                # Convert BGR to RGB
+                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+                # Convert to QImage
+                h, w, ch = frame_rgb.shape
+                bytes_per_line = ch * w
+                qt_image = QImage(frame_rgb.data, w, h, bytes_per_line, QImage.Format_RGB888)
+                
+                # Display
+                self.setPixmap(QPixmap.fromImage(qt_image))
+        except Exception as e:
+            self.setText(f"Error: {str(e)}")
+    
+    def stop_preview(self):
+        """Stop camera preview"""
+        if self.timer is not None:
+            self.timer.stop()
+            self.timer = None
+        
+        if self.capture is not None:
+            self.capture.release()
+            self.capture = None
+        
+        self.setText("No Camera")
+    
+    def closeEvent(self, event):
+        """Clean up when widget is closed"""
+        self.stop_preview()
+        super().closeEvent(event)
 
 
 class SoundMonitorApp(QMainWindow):
@@ -776,7 +1010,10 @@ class SoundMonitorApp(QMainWindow):
     def create_live_tab(self):
         """Create the live monitoring tab"""
         widget = QWidget()
-        layout = QHBoxLayout()
+        main_layout = QVBoxLayout()
+        
+        # Top row: Audio monitoring
+        audio_layout = QHBoxLayout()
         
         # Left side: waveform
         waveform_group = QGroupBox("Live Waveform")
@@ -784,7 +1021,7 @@ class SoundMonitorApp(QMainWindow):
         self.waveform = WaveformWidget()
         waveform_layout.addWidget(self.waveform)
         waveform_group.setLayout(waveform_layout)
-        layout.addWidget(waveform_group, stretch=3)
+        audio_layout.addWidget(waveform_group, stretch=3)
         
         # Right side: dB meter
         meter_group = QGroupBox("Sound Level")
@@ -792,9 +1029,25 @@ class SoundMonitorApp(QMainWindow):
         self.db_meter = DecibelMeter()
         meter_layout.addWidget(self.db_meter)
         meter_group.setLayout(meter_layout)
-        layout.addWidget(meter_group, stretch=1)
+        audio_layout.addWidget(meter_group, stretch=1)
         
-        widget.setLayout(layout)
+        main_layout.addLayout(audio_layout, stretch=2)
+        
+        # Bottom row: Camera preview (if available)
+        if CV2_AVAILABLE:
+            camera_group = QGroupBox("📹 Camera Preview")
+            camera_layout = QVBoxLayout()
+            self.camera_preview = CameraPreviewWidget()
+            camera_layout.addWidget(self.camera_preview)
+            
+            camera_info = QLabel("<i>Enable video recording in Settings tab</i>")
+            camera_info.setAlignment(Qt.AlignCenter)
+            camera_layout.addWidget(camera_info)
+            
+            camera_group.setLayout(camera_layout)
+            main_layout.addWidget(camera_group, stretch=1)
+        
+        widget.setLayout(main_layout)
         return widget
     
     def create_log_tab(self):
@@ -825,6 +1078,7 @@ class SoundMonitorApp(QMainWindow):
         # Event table
         self.event_table = EventLogTable()
         self.event_table.play_requested.connect(self.play_audio)
+        self.event_table.play_video_requested.connect(self.play_video)
         layout.addWidget(self.event_table)
         
         # Load initial events
@@ -1078,6 +1332,43 @@ class SoundMonitorApp(QMainWindow):
         device_group.setLayout(device_layout)
         layout.addWidget(device_group)
         
+        # Camera settings (if available)
+        if CV2_AVAILABLE:
+            camera_group = QGroupBox("📹 Video Recording Settings")
+            camera_layout = QVBoxLayout()
+            
+            # Enable/disable video recording
+            self.video_enabled_checkbox = QCheckBox("Enable Video Recording on Loud Events")
+            self.video_enabled_checkbox.setChecked(False)
+            self.video_enabled_checkbox.stateChanged.connect(self.on_video_enabled_changed)
+            camera_layout.addWidget(self.video_enabled_checkbox)
+            
+            # Camera selection
+            camera_select_layout = QHBoxLayout()
+            camera_select_layout.addWidget(QLabel("Camera:"))
+            self.camera_combo = QComboBox()
+            cameras = self.audio_processor.get_camera_devices()
+            for idx, name in cameras:
+                self.camera_combo.addItem(name, idx)
+            self.camera_combo.currentIndexChanged.connect(self.on_camera_changed)
+            if cameras:
+                self.audio_processor.set_camera(cameras[0][0])
+            camera_select_layout.addWidget(self.camera_combo)
+            camera_select_layout.addStretch()
+            camera_layout.addLayout(camera_select_layout)
+            
+            # Info about video settings
+            video_info = QLabel(
+                f"<i>Video: {VIDEO_WIDTH}x{VIDEO_HEIGHT} @ {VIDEO_FPS} FPS<br>"
+                "Videos only recorded during loud events to save storage<br>"
+                "Approx. 5-10 MB per minute of event video</i>"
+            )
+            video_info.setWordWrap(True)
+            camera_layout.addWidget(video_info)
+            
+            camera_group.setLayout(camera_layout)
+            layout.addWidget(camera_group)
+        
         # Storage info
         storage_group = QGroupBox("Storage Information")
         storage_layout = QVBoxLayout()
@@ -1149,6 +1440,31 @@ class SoundMonitorApp(QMainWindow):
     def on_calibration_changed(self, value):
         """Handle calibration offset change"""
         self.audio_processor.set_calibration(value)
+    
+    def on_camera_changed(self, index):
+        """Handle camera selection change"""
+        if not CV2_AVAILABLE:
+            return
+        
+        camera_index = self.camera_combo.currentData()
+        self.audio_processor.set_camera(camera_index)
+        
+        # Update camera preview if exists
+        if hasattr(self, 'camera_preview'):
+            self.camera_preview.start_preview(camera_index)
+    
+    def on_video_enabled_changed(self, state):
+        """Handle video enabled checkbox change"""
+        enabled = (state == Qt.Checked)
+        self.audio_processor.set_video_enabled(enabled)
+        
+        # Start/stop camera preview based on state
+        if hasattr(self, 'camera_preview'):
+            if enabled:
+                camera_index = self.camera_combo.currentData() if hasattr(self, 'camera_combo') else 0
+                self.camera_preview.start_preview(camera_index)
+            else:
+                self.camera_preview.stop_preview()
     
     def on_level_updated(self, rms, db_level):
         """Handle audio level update"""
@@ -1269,6 +1585,36 @@ class SoundMonitorApp(QMainWindow):
                 QMessageBox.warning(self, "Error", "Audio playback not supported on this platform")
         except Exception as e:
             QMessageBox.warning(self, "Error", f"Failed to play audio: {str(e)}")
+    
+    def play_video(self, video_filename):
+        """Play video file"""
+        try:
+            import subprocess
+            import platform
+            
+            if not os.path.exists(video_filename):
+                QMessageBox.warning(self, "Error", f"Video file not found: {video_filename}")
+                return
+            
+            # Use system player to play video
+            system = platform.system()
+            if system == 'Darwin':  # macOS
+                subprocess.Popen(['open', video_filename])
+            elif system == 'Linux':
+                # Try common Linux video players
+                for player in ['vlc', 'mpv', 'ffplay', 'mplayer']:
+                    try:
+                        subprocess.Popen([player, video_filename])
+                        return
+                    except FileNotFoundError:
+                        continue
+                QMessageBox.warning(self, "Error", "No video player found. Please install vlc, mpv, or ffplay.")
+            elif system == 'Windows':
+                os.startfile(video_filename)
+            else:
+                QMessageBox.warning(self, "Error", "Video playback not supported on this platform")
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to play video: {str(e)}")
     
     def update_storage_info(self):
         """Update storage information"""
