@@ -38,7 +38,7 @@ from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QComboBox, QSlider, QTableWidget, QTableWidgetItem,
     QTabWidget, QFileDialog, QMessageBox, QProgressBar, QGroupBox,
-    QGridLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QTextEdit
+    QGridLayout, QSpinBox, QDoubleSpinBox, QCheckBox, QTextEdit, QScrollArea
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject
 from PyQt5.QtGui import QPalette, QColor, QImage, QPixmap
@@ -940,6 +940,9 @@ class SoundMonitorApp(QMainWindow):
         self.setWindowTitle("Sound Monitor - Noise Pollution Documentation Tool")
         self.setGeometry(100, 100, 1400, 900)
         
+        # Set minimum window size to prevent squishing
+        self.setMinimumSize(1000, 700)
+        
         # Central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -1112,6 +1115,13 @@ class SoundMonitorApp(QMainWindow):
     
     def create_analytics_tab(self):
         """Create the analytics tab with graphs and visualizations"""
+        # Main scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        # Content widget inside scroll area
         widget = QWidget()
         layout = QVBoxLayout()
         
@@ -1127,13 +1137,15 @@ class SoundMonitorApp(QMainWindow):
         from matplotlib.figure import Figure
         self.analytics_figure = Figure(figsize=(12, 8))
         self.analytics_canvas = FigureCanvas(self.analytics_figure)
+        self.analytics_canvas.setMinimumSize(800, 600)  # Set minimum size to prevent squishing
         layout.addWidget(self.analytics_canvas)
         
         # Initial update
         self.update_analytics()
         
         widget.setLayout(layout)
-        return widget
+        scroll_area.setWidget(widget)
+        return scroll_area
     
     def update_analytics(self):
         """Update analytics charts with event data"""
@@ -1257,6 +1269,13 @@ class SoundMonitorApp(QMainWindow):
     
     def create_statistics_tab(self):
         """Create the statistics tab"""
+        # Main scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        # Content widget inside scroll area
         widget = QWidget()
         layout = QVBoxLayout()
         
@@ -1273,10 +1292,18 @@ class SoundMonitorApp(QMainWindow):
         self.statistics_widget.update_statistics()
         
         widget.setLayout(layout)
-        return widget
+        scroll_area.setWidget(widget)
+        return scroll_area
     
     def create_settings_tab(self):
         """Create the settings tab"""
+        # Main scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
+        # Content widget inside scroll area
         widget = QWidget()
         layout = QVBoxLayout()
         
@@ -1421,7 +1448,8 @@ class SoundMonitorApp(QMainWindow):
         self.update_system_status()
         
         widget.setLayout(layout)
-        return widget
+        scroll_area.setWidget(widget)
+        return scroll_area
     
     def on_device_changed(self, index):
         """Handle device selection change"""
