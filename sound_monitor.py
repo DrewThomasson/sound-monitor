@@ -122,6 +122,15 @@ class AudioProcessor(QObject):
                       filename TEXT,
                       video_filename TEXT,
                       low_frequency BOOLEAN)''')
+        
+        # Migration: Add video_filename column if it doesn't exist (for existing databases)
+        try:
+            c.execute("SELECT video_filename FROM events LIMIT 1")
+        except sqlite3.OperationalError:
+            # Column doesn't exist, add it
+            c.execute("ALTER TABLE events ADD COLUMN video_filename TEXT")
+            conn.commit()
+            
         conn.commit()
         conn.close()
         
@@ -162,22 +171,20 @@ class AudioProcessor(QObject):
         """Enable or disable video recording"""
         self.video_enabled = enabled and CV2_AVAILABLE
     
+    def set_camera_widget(self, camera_widget):
+        """Set reference to camera preview widget for shared camera access"""
+        self.camera_widget = camera_widget
+    
     def start_video_recording(self, event_timestamp):
         """Start recording video for an event"""
         if not self.video_enabled or not CV2_AVAILABLE:
             return None
         
+        if not hasattr(self, 'camera_widget') or self.camera_widget is None:
+            self.error_occurred.emit("Camera preview not initialized")
+            return None
+        
         try:
-            cap = cv2.VideoCapture(self.camera_index)
-            if not cap.isOpened():
-                self.error_occurred.emit(f"Cannot open camera {self.camera_index}")
-                return None
-            
-            # Set camera properties
-            cap.set(cv2.CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH)
-            cap.set(cv2.CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT)
-            cap.set(cv2.CAP_PROP_FPS, VIDEO_FPS)
-            
             # Create video filename
             video_filename = os.path.join(VIDEOS_DIR, f"event_{event_timestamp}.mp4")
             
@@ -185,9 +192,12 @@ class AudioProcessor(QObject):
             fourcc = cv2.VideoWriter_fourcc(*VIDEO_CODEC)
             out = cv2.VideoWriter(video_filename, fourcc, VIDEO_FPS, (VIDEO_WIDTH, VIDEO_HEIGHT))
             
+            if not out.isOpened():
+                self.error_occurred.emit("Cannot create video writer")
+                return None
+            
             self.video_writer = out
             self.video_event_filename = video_filename
-            self.video_capture = cap
             
             return video_filename
         except Exception as e:
@@ -195,13 +205,17 @@ class AudioProcessor(QObject):
             return None
     
     def write_video_frame(self):
-        """Capture and write a single video frame"""
-        if self.video_writer is None or not hasattr(self, 'video_capture'):
+        """Capture and write a single video frame from camera preview"""
+        if self.video_writer is None:
+            return
+        
+        if not hasattr(self, 'camera_widget') or self.camera_widget is None:
             return
         
         try:
-            ret, frame = self.video_capture.read()
-            if ret:
+            # Get frame from camera preview widget (shared camera)
+            frame = self.camera_widget.get_current_frame()
+            if frame is not None:
                 self.video_writer.write(frame)
         except Exception as e:
             self.error_occurred.emit(f"Error writing video frame: {str(e)}")
@@ -214,13 +228,6 @@ class AudioProcessor(QObject):
             except:
                 pass
             self.video_writer = None
-        
-        if hasattr(self, 'video_capture'):
-            try:
-                self.video_capture.release()
-            except:
-                pass
-            delattr(self, 'video_capture')
         
         filename = self.video_event_filename
         self.video_event_filename = None
@@ -822,12 +829,17 @@ class CameraPreviewWidget(QLabel):
         self.camera_index = 0
         self.capture = None
         self.timer = None
+        self.current_frame = None  # Store current frame for video recording
         self.setMinimumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
         self.setMaximumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
         self.setScaledContents(True)
         self.setStyleSheet("QLabel { background-color: black; border: 2px solid gray; }")
         self.setText("No Camera")
         self.setAlignment(Qt.AlignCenter)
+    
+    def get_current_frame(self):
+        """Get the current camera frame for video recording (BGR format)"""
+        return self.current_frame
     
     def start_preview(self, camera_index=0):
         """Start camera preview"""
@@ -866,7 +878,10 @@ class CameraPreviewWidget(QLabel):
         try:
             ret, frame = self.capture.read()
             if ret:
-                # Convert BGR to RGB
+                # Store current frame for video recording (BGR format)
+                self.current_frame = frame.copy()
+                
+                # Convert BGR to RGB for display
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
                 # Convert to QImage
@@ -889,6 +904,7 @@ class CameraPreviewWidget(QLabel):
             self.capture.release()
             self.capture = None
         
+        self.current_frame = None
         self.setText("No Camera")
     
     def closeEvent(self, event):
@@ -1043,6 +1059,9 @@ class SoundMonitorApp(QMainWindow):
             camera_layout = QVBoxLayout()
             self.camera_preview = CameraPreviewWidget()
             camera_layout.addWidget(self.camera_preview)
+            
+            # Connect camera preview to audio processor for video recording
+            self.audio_processor.set_camera_widget(self.camera_preview)
             
             camera_info = QLabel("<i>Enable video recording in Settings tab</i>")
             camera_info.setAlignment(Qt.AlignCenter)
