@@ -62,6 +62,7 @@ class AudioProcessor(QObject):
         self.stream = None
         self.recording = False
         self.device_index = None
+        self.device_sample_rate = RATE  # Will be auto-detected per device
         self.threshold_db = 80
         self.calibration_offset = 0
         self.current_segment = []
@@ -107,9 +108,58 @@ class AudioProcessor(QObject):
                 devices.append((i, info['name']))
         return devices
     
+    def detect_sample_rate(self, device_index):
+        """Detect the best supported sample rate for a device"""
+        if not PYAUDIO_AVAILABLE:
+            return RATE
+        
+        if self.p is None:
+            self.p = pyaudio.PyAudio()
+        
+        # Common sample rates to try, in order of preference
+        preferred_rates = [44100, 48000, 32000, 22050, 16000, 8000]
+        
+        device_info = self.p.get_device_info_by_index(device_index)
+        
+        # First try the device's default sample rate
+        try:
+            default_rate = int(device_info.get('defaultSampleRate', 44100))
+            if self.p.is_format_supported(
+                default_rate,
+                input_device=device_index,
+                input_channels=CHANNELS,
+                input_format=FORMAT
+            ):
+                self.status_updated.emit(f"Using device sample rate: {default_rate} Hz")
+                return default_rate
+        except:
+            pass
+        
+        # Try preferred rates
+        for rate in preferred_rates:
+            try:
+                if self.p.is_format_supported(
+                    rate,
+                    input_device=device_index,
+                    input_channels=CHANNELS,
+                    input_format=FORMAT
+                ):
+                    self.status_updated.emit(f"Using sample rate: {rate} Hz")
+                    return rate
+            except:
+                continue
+        
+        # If nothing works, return default
+        self.error_occurred.emit(f"Could not find supported sample rate, using {RATE} Hz")
+        return RATE
+    
     def set_device(self, device_index):
-        """Set the input device"""
+        """Set the input device and auto-detect sample rate"""
         self.device_index = device_index
+        if device_index is not None:
+            self.device_sample_rate = self.detect_sample_rate(device_index)
+        else:
+            self.device_sample_rate = RATE
         
     def set_threshold(self, threshold_db):
         """Set the detection threshold in dB"""
@@ -142,7 +192,7 @@ class AudioProcessor(QObject):
         
         # Apply FFT
         fft = np.fft.rfft(audio_array)
-        freqs = np.fft.rfftfreq(len(audio_array), 1/RATE)
+        freqs = np.fft.rfftfreq(len(audio_array), 1/self.device_sample_rate)
         
         # Calculate energy in low frequency band (20-200 Hz)
         low_freq_mask = (freqs >= 20) & (freqs <= 200)
@@ -164,7 +214,7 @@ class AudioProcessor(QObject):
             wf = wave.open(wav_filename, 'wb')
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(self.p.get_sample_size(FORMAT))
-            wf.setframerate(RATE)
+            wf.setframerate(self.device_sample_rate)
             wf.writeframes(audio_data)
             wf.close()
             
@@ -218,10 +268,14 @@ class AudioProcessor(QObject):
             if self.p is None:
                 self.p = pyaudio.PyAudio()
             
+            # Ensure we have detected the sample rate for this device
+            if self.device_index is not None:
+                self.device_sample_rate = self.detect_sample_rate(self.device_index)
+            
             self.stream = self.p.open(
                 format=FORMAT,
                 channels=CHANNELS,
-                rate=RATE,
+                rate=self.device_sample_rate,
                 input=True,
                 input_device_index=self.device_index,
                 frames_per_buffer=CHUNK
@@ -230,7 +284,7 @@ class AudioProcessor(QObject):
             self.recording = True
             self.current_segment = []
             self.segment_start_time = datetime.now()
-            self.status_updated.emit("Recording started")
+            self.status_updated.emit(f"Recording started at {self.device_sample_rate} Hz")
             
             # Start recording thread
             self.record_thread = threading.Thread(target=self._record_loop)
@@ -285,8 +339,8 @@ class AudioProcessor(QObject):
                 # Add to current segment
                 self.current_segment.append(data)
                 
-                # Check if we've recorded enough for a segment
-                if len(self.current_segment) * CHUNK >= RATE * RECORD_SECONDS:
+                # Check if we've recorded enough for a segment (using device sample rate)
+                if len(self.current_segment) * CHUNK >= self.device_sample_rate * RECORD_SECONDS:
                     # Save segment
                     timestamp = self.segment_start_time.strftime("%Y%m%d_%H%M%S")
                     audio_data = b''.join(self.current_segment)
@@ -763,29 +817,80 @@ class SoundMonitorApp(QMainWindow):
         widget = QWidget()
         layout = QVBoxLayout()
         
-        # Calibration group
-        calibration_group = QGroupBox("Microphone Calibration")
+        # Calibration group - Enhanced
+        calibration_group = QGroupBox("🎤 Microphone Calibration")
         cal_layout = QVBoxLayout()
         
-        cal_info = QLabel("Calibrate your microphone for accurate dB readings.\n"
-                         "Use a calibrated sound level meter as reference.\n"
-                         "Adjust the offset until readings match.")
+        cal_info = QLabel(
+            "<b>Calibrate your microphone for accurate dB readings:</b><br>"
+            "1. Use a calibrated sound level meter as reference<br>"
+            "2. Make a constant noise (clap, music, etc.)<br>"
+            "3. Compare the reading on this app with your meter<br>"
+            "4. Adjust the offset until they match<br>"
+            "<br><i>Example: If app shows 75 dB but meter shows 80 dB, set offset to +5.0</i>"
+        )
+        cal_info.setWordWrap(True)
         cal_layout.addWidget(cal_info)
         
+        # Current reading display
+        self.current_db_label = QLabel("Current Reading: -- dB")
+        self.current_db_label.setStyleSheet("font-size: 16pt; font-weight: bold; color: blue;")
+        cal_layout.addWidget(self.current_db_label)
+        
+        # Calibration offset control
         cal_control_layout = QHBoxLayout()
         cal_control_layout.addWidget(QLabel("Calibration Offset (dB):"))
         self.calibration_spinbox = QDoubleSpinBox()
         self.calibration_spinbox.setMinimum(-50)
         self.calibration_spinbox.setMaximum(50)
         self.calibration_spinbox.setValue(0)
-        self.calibration_spinbox.setSingleStep(0.1)
+        self.calibration_spinbox.setSingleStep(0.5)
         self.calibration_spinbox.valueChanged.connect(self.on_calibration_changed)
+        self.calibration_spinbox.setStyleSheet("font-size: 12pt; font-weight: bold;")
         cal_control_layout.addWidget(self.calibration_spinbox)
+        
+        # Quick adjustment buttons
+        quick_minus_5 = QPushButton("-5")
+        quick_minus_5.clicked.connect(lambda: self.adjust_calibration(-5))
+        cal_control_layout.addWidget(quick_minus_5)
+        
+        quick_minus_1 = QPushButton("-1")
+        quick_minus_1.clicked.connect(lambda: self.adjust_calibration(-1))
+        cal_control_layout.addWidget(quick_minus_1)
+        
+        quick_plus_1 = QPushButton("+1")
+        quick_plus_1.clicked.connect(lambda: self.adjust_calibration(+1))
+        cal_control_layout.addWidget(quick_plus_1)
+        
+        quick_plus_5 = QPushButton("+5")
+        quick_plus_5.clicked.connect(lambda: self.adjust_calibration(+5))
+        cal_control_layout.addWidget(quick_plus_5)
+        
+        reset_cal = QPushButton("Reset")
+        reset_cal.clicked.connect(lambda: self.calibration_spinbox.setValue(0))
+        cal_control_layout.addWidget(reset_cal)
+        
         cal_control_layout.addStretch()
         cal_layout.addLayout(cal_control_layout)
         
+        # Calibrated reading display
+        self.calibrated_db_label = QLabel("Calibrated Reading: -- dB")
+        self.calibrated_db_label.setStyleSheet("font-size: 18pt; font-weight: bold; color: green;")
+        cal_layout.addWidget(self.calibrated_db_label)
+        
         calibration_group.setLayout(cal_layout)
         layout.addWidget(calibration_group)
+        
+        # Device info
+        device_group = QGroupBox("Audio Device Information")
+        device_layout = QVBoxLayout()
+        
+        self.device_info_label = QLabel("Select a device from the dropdown above")
+        self.device_info_label.setWordWrap(True)
+        device_layout.addWidget(self.device_info_label)
+        
+        device_group.setLayout(device_layout)
+        layout.addWidget(device_group)
         
         # Storage info
         storage_group = QGroupBox("Storage Information")
@@ -822,6 +927,22 @@ class SoundMonitorApp(QMainWindow):
         """Handle device selection change"""
         device_index = self.device_combo.currentData()
         self.audio_processor.set_device(device_index)
+        
+        # Update device info display
+        if PYAUDIO_AVAILABLE and device_index is not None:
+            try:
+                if self.audio_processor.p is None:
+                    self.audio_processor.p = pyaudio.PyAudio()
+                
+                device_info = self.audio_processor.p.get_device_info_by_index(device_index)
+                info_text = f"<b>Device:</b> {device_info['name']}<br>"
+                info_text += f"<b>Sample Rate:</b> {self.audio_processor.device_sample_rate} Hz<br>"
+                info_text += f"<b>Max Input Channels:</b> {device_info['maxInputChannels']}<br>"
+                info_text += f"<b>Default Sample Rate:</b> {int(device_info['defaultSampleRate'])} Hz<br>"
+                
+                self.device_info_label.setText(info_text)
+            except Exception as e:
+                self.device_info_label.setText(f"Could not get device info: {str(e)}")
     
     def toggle_recording(self):
         """Toggle recording on/off"""
@@ -846,6 +967,16 @@ class SoundMonitorApp(QMainWindow):
     def on_level_updated(self, rms, db_level):
         """Handle audio level update"""
         self.db_meter.update_level(db_level)
+        
+        # Update calibration display in settings tab
+        raw_db = db_level - self.audio_processor.calibration_offset
+        self.current_db_label.setText(f"Current Reading (raw): {raw_db:.1f} dB")
+        self.calibrated_db_label.setText(f"Calibrated Reading: {db_level:.1f} dB")
+    
+    def adjust_calibration(self, delta):
+        """Adjust calibration by a specific amount"""
+        current = self.calibration_spinbox.value()
+        self.calibration_spinbox.setValue(current + delta)
     
     def on_event_detected(self, event_data):
         """Handle event detection"""
