@@ -1032,31 +1032,44 @@ class SoundMonitorApp(QMainWindow):
     
     def create_live_tab(self):
         """Create the live monitoring tab"""
-        widget = QWidget()
-        main_layout = QVBoxLayout()
+        # Scroll area for the tab
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
-        # Top row: Audio monitoring
-        audio_layout = QHBoxLayout()
+        # Content widget with horizontal layout (side-by-side)
+        content_widget = QWidget()
+        main_layout = QHBoxLayout()
         
-        # Left side: waveform
+        # Left side: Audio monitoring (waveform + dB meter)
+        audio_widget = QWidget()
+        audio_main_layout = QVBoxLayout()
+        
+        # Audio controls in vertical arrangement
+        audio_controls_layout = QHBoxLayout()
+        
+        # Waveform
         waveform_group = QGroupBox("Live Waveform")
         waveform_layout = QVBoxLayout()
         self.waveform = WaveformWidget()
         waveform_layout.addWidget(self.waveform)
         waveform_group.setLayout(waveform_layout)
-        audio_layout.addWidget(waveform_group, stretch=3)
+        audio_controls_layout.addWidget(waveform_group, stretch=3)
         
-        # Right side: dB meter
+        # dB meter
         meter_group = QGroupBox("Sound Level")
         meter_layout = QVBoxLayout()
         self.db_meter = DecibelMeter()
         meter_layout.addWidget(self.db_meter)
         meter_group.setLayout(meter_layout)
-        audio_layout.addWidget(meter_group, stretch=1)
+        audio_controls_layout.addWidget(meter_group, stretch=1)
         
-        main_layout.addLayout(audio_layout, stretch=2)
+        audio_main_layout.addLayout(audio_controls_layout)
+        audio_widget.setLayout(audio_main_layout)
+        main_layout.addWidget(audio_widget, stretch=3)
         
-        # Bottom row: Camera preview (if available)
+        # Right side: Camera preview (if available)
         if CV2_AVAILABLE:
             camera_group = QGroupBox("📹 Camera Preview")
             camera_layout = QVBoxLayout()
@@ -1071,10 +1084,11 @@ class SoundMonitorApp(QMainWindow):
             camera_layout.addWidget(camera_info)
             
             camera_group.setLayout(camera_layout)
-            main_layout.addWidget(camera_group, stretch=1)
+            main_layout.addWidget(camera_group, stretch=2)
         
-        widget.setLayout(main_layout)
-        return widget
+        content_widget.setLayout(main_layout)
+        scroll_area.setWidget(content_widget)
+        return scroll_area
     
     def create_log_tab(self):
         """Create the event log tab"""
