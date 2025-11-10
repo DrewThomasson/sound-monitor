@@ -165,6 +165,13 @@ sound-monitor/
 - Check system sound settings
 - On Linux, verify ALSA/PulseAudio configuration
 
+### Qt plugin error (Linux/Manjaro with video recording)
+If you see `qt.qpa.plugin: Could not load the Qt platform plugin "xcb"`:
+- The application automatically fixes this conflict between OpenCV and PyQt5
+- If using an older version, update to the latest commit
+- Or run: `unset QT_QPA_PLATFORM_PLUGIN_PATH && python3 sound_monitor.py`
+- Alternative: `pip uninstall opencv-python && pip install opencv-python-headless`
+
 ### "Recording error: [Errno -9981] Input overflowed"
 - This is usually harmless and automatically handled
 - Consider reducing the buffer size if it happens frequently

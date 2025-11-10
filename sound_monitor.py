@@ -23,6 +23,10 @@ except ImportError:
     PYAUDIO_AVAILABLE = False
     pyaudio = None
 
+# Fix Qt plugin conflict between OpenCV and PyQt5
+# Must be set BEFORE importing cv2
+os.environ.pop('QT_QPA_PLATFORM_PLUGIN_PATH', None)
+
 try:
     import cv2
     CV2_AVAILABLE = True

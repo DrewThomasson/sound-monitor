@@ -121,12 +121,33 @@ With Event Videos (estimated):
 
 ## Troubleshooting
 
+### Qt Plugin Error (Linux/Manjaro)
+If you see an error like:
+```
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb"
+IOT instruction (core dumped)
+```
+
+**Solution:** This is a Qt plugin conflict between OpenCV and PyQt5. The latest version of the application automatically fixes this. If you're using an older version, update to the latest commit.
+
+**Manual Fix (if needed):**
+```bash
+# Unset OpenCV's Qt plugin path before running
+unset QT_QPA_PLATFORM_PLUGIN_PATH
+python3 sound_monitor.py
+
+# Or use opencv-python-headless
+pip uninstall opencv-python
+pip install opencv-python-headless
+```
+
 ### Camera Not Detected
 ```
 - Check if camera is connected
 - Try different USB port
 - Check camera permissions (Linux/macOS)
 - Install camera drivers (Windows)
+- On Linux: sudo usermod -a -G video $USER (then logout/login)
 ```
 
 ### "OpenCV not available" Message
