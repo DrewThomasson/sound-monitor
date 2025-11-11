@@ -1,6 +1,6 @@
 # Sound Monitor - Noise Pollution Documentation Tool
 
-I hate loud cars so I made an app to log them.
+I hate loud cars so I made an application LOG WHEN THEY ARE TOO LOUD.
 
 ### Professional Statatment:
 
