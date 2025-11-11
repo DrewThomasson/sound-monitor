@@ -37,11 +37,13 @@ env/
 
 # Application specific
 recordings/
+videos/
 *.mp3
 *.wav
 sound_events.db
 sound_events.db-journal
 sample_sound_events.csv
+wind_filter_demo.png
 
 # OS
 .DS_Store

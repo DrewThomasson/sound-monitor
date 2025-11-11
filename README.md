@@ -19,6 +19,7 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 - **Comprehensive Logging**: Stores timestamp, duration, peak dB, average dB, and file reference for each event
 - **SQLite Database**: Fast, efficient storage for quick searches and analysis
 - **Low-Frequency Detection**: Specifically identifies low-frequency noise like car rumble (20-200 Hz)
+- **Wind Noise Filter**: Optional high-pass filter to reduce false alarms from wind noise (configurable cutoff frequency)
 
 ### User Interface
 - **Live Waveform Visualization**: See audio waveform in real-time
@@ -27,6 +28,7 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 - **Recording Controls**: Simple start/stop interface
 - **Threshold Adjustment**: Slider to set detection sensitivity (40-120 dB)
 - **Microphone Calibration**: Offset adjustment for accurate measurements
+- **Wind Filter Controls**: Enable/disable wind filtering and adjust cutoff frequency
 
 ### Logs & Playback
 - **Event Log Table**: View all recorded events in a sortable table
@@ -131,6 +133,20 @@ python sound_monitor.py
 - Place microphone in weather-protected location
 - Check "System Status" tab for battery monitoring
 - Consider using an external USB microphone for better quality
+- **Enable wind noise filter** if experiencing false alarms from wind (Settings tab)
+
+**Dealing with Wind Noise:**
+- Wind noise is a common issue in outdoor monitoring, appearing as low-frequency rumble
+- Enable the **Wind Noise Filter** in the Settings tab to reduce false alarms
+- Recommended cutoff frequencies:
+  - **80 Hz (default)**: Good balance for most outdoor conditions
+  - **60 Hz**: More aggressive filtering for very windy conditions
+  - **100 Hz**: Less aggressive, preserves more low-frequency sounds
+- Note: Wind filtering may reduce detection of very low-frequency sounds like distant traffic
+- For best results, combine wind filtering with:
+  - Physical windscreen on microphone (foam cover)
+  - Sheltered microphone placement (away from direct wind)
+  - Threshold adjustment to avoid detecting minor wind gusts
 
 **For Evidence Collection:**
 - Calibrate your microphone for accurate dB readings
