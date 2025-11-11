@@ -88,10 +88,6 @@ sound-monitor/
 - **dB Calculation**: RMS-based, referenced to max int16 value, calibrated to ~94 dB SPL
 - **Low-Frequency Detection**: FFT-based, 20-200 Hz range, >40% energy threshold
 
-## License
-
-MIT License - See LICENSE file for details
-
 ## Support
 
 For issues, questions, or suggestions, please open an issue on GitHub.
