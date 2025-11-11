@@ -27,8 +27,6 @@ An app for monitoring, recording, and documenting noise pollution to present evi
 - **Real-time Decibel Monitoring**: Tracks sound levels continuously
 - **Low-Frequency Detection**: Specifically identifies low-frequency noise like car rumble (20-200 Hz)
 
-### User Interface
-
 
 ### Install
 
