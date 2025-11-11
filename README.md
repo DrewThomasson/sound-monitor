@@ -62,17 +62,36 @@ python run.py
 
 ## File Organization
 
-The application creates the following structure:
+The application creates the following structure at runtime:
 
 ```
 sound-monitor/
-├── sound_monitor.py          # Main application
+├── sound_monitor.py          # Main application (1030+ lines, handles GUI, audio processing, database)
+├── run.py                    # Launcher script with dependency checks
 ├── requirements.txt          # Python dependencies
-├── sound_events.db          # SQLite database with event logs
-└── recordings/              # Audio recordings
-    ├── 20240315_143022.mp3         # Regular 1-minute segments
-    ├── event_20240315_143045.mp3   # Detected loud events
-    └── ...
+├── setup.py                  # Installation script
+├── test_sound_monitor.py     # Test suite
+├── example_demo.py           # Demo with sample data
+│
+├── recordings/               # Audio recordings directory (created at runtime)
+│   ├── YYYYMMDD_HHMMSS.mp3         # Regular 1-minute audio segments
+│   ├── event_YYYYMMDD_HHMMSS_ffffff.mp3   # Detected loud events with pre/post buffers
+│   └── temp_*.wav            # Temporary WAV files (cleaned up after MP3 conversion)
+│
+├── videos/                   # Video recordings directory (created at runtime, optional)
+│   ├── event_YYYYMMDD_HHMMSS_ffffff.mp4   # Video recordings of loud events (if enabled)
+│   └── ...
+│
+└── sound_events.db           # SQLite database with event logs
+    └── events table:
+        - id (PRIMARY KEY)
+        - timestamp (event time)
+        - duration (event length in seconds)
+        - peak_db (highest dB level)
+        - avg_db (average dB level)
+        - filename (audio file path)
+        - video_filename (optional video file path)
+        - low_frequency (boolean, car rumble detection)
 ```
 
 
