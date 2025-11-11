@@ -1,5 +1,9 @@
 # Sound Monitor - Noise Pollution Documentation Tool
 
+I hate loud cars so I made an app to log them.
+
+### Professional Statatment:
+
 An app for monitoring, recording, and documenting noise pollution to present evidence to city councils or other authorities.
 
 <img width="672" height="449" alt="image" src="https://github.com/user-attachments/assets/1aec8be2-3b0e-4c67-8a7b-dc6f8a29e07e" />
