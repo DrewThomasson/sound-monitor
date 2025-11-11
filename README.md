@@ -5,6 +5,10 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 <img width="672" height="449" alt="image" src="https://github.com/user-attachments/assets/1aec8be2-3b0e-4c67-8a7b-dc6f8a29e07e" />
 
 
+## GUI
+<img width="1496" height="854" alt="Screenshot_20251110_211147" src="https://github.com/user-attachments/assets/29ef3b97-6abd-459f-a7ba-0f4781d4cfdb" />
+
+
 ## Features
 
 ### Audio Recording & Storage
