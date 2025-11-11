@@ -96,6 +96,11 @@ class AudioProcessor(QObject):
         self.audio_ring_buffer = []
         self.max_ring_buffer_samples = int(self.pre_event_buffer_seconds * RATE / CHUNK)
         
+        # Wind noise filtering parameters
+        self.wind_filter_enabled = False
+        self.wind_filter_cutoff = 80  # Hz - cutoff frequency for high-pass filter
+        self.wind_filter_order = 4  # Filter order
+        
         # Video recording attributes
         self.video_enabled = False
         self.camera_index = 0
@@ -293,6 +298,55 @@ class AudioProcessor(QObject):
     def set_calibration(self, offset):
         """Set calibration offset for dB readings"""
         self.calibration_offset = offset
+    
+    def set_wind_filter(self, enabled):
+        """Enable or disable wind noise filtering"""
+        self.wind_filter_enabled = enabled
+        if enabled:
+            self.status_updated.emit(f"Wind filter enabled (cutoff: {self.wind_filter_cutoff} Hz)")
+        else:
+            self.status_updated.emit("Wind filter disabled")
+    
+    def set_wind_filter_cutoff(self, cutoff_hz):
+        """Set the cutoff frequency for wind noise filter"""
+        self.wind_filter_cutoff = cutoff_hz
+        if self.wind_filter_enabled:
+            self.status_updated.emit(f"Wind filter cutoff updated: {cutoff_hz} Hz")
+    
+    def apply_wind_filter(self, audio_data):
+        """Apply high-pass filter to remove low-frequency wind noise"""
+        if not self.wind_filter_enabled:
+            return audio_data
+        
+        try:
+            # Convert bytes to numpy array
+            audio_array = np.frombuffer(audio_data, dtype=np.int16).astype(np.float64)
+            
+            # Design Butterworth high-pass filter
+            # Cutoff frequency normalized by Nyquist frequency
+            nyquist = self.device_sample_rate / 2
+            normalized_cutoff = self.wind_filter_cutoff / nyquist
+            
+            # Ensure cutoff is valid (between 0 and 1)
+            if normalized_cutoff >= 1.0 or normalized_cutoff <= 0:
+                # Invalid cutoff, return original
+                return audio_data
+            
+            # Design filter
+            b, a = scipy_signal.butter(self.wind_filter_order, normalized_cutoff, btype='high')
+            
+            # Apply filter
+            filtered_audio = scipy_signal.filtfilt(b, a, audio_array)
+            
+            # Convert back to int16
+            filtered_audio = np.clip(filtered_audio, -32768, 32767).astype(np.int16)
+            
+            return filtered_audio.tobytes()
+            
+        except Exception as e:
+            # If filtering fails, return original audio
+            self.error_occurred.emit(f"Wind filter error: {str(e)}")
+            return audio_data
         
     def calculate_db(self, audio_data):
         """Calculate decibel level from audio data"""
@@ -457,18 +511,21 @@ class AudioProcessor(QObject):
                 # Read audio data
                 data = self.stream.read(CHUNK, exception_on_overflow=False)
                 
-                # Calculate dB level
-                db_level = self.calculate_db(data)
-                rms = np.sqrt(np.mean(np.frombuffer(data, dtype=np.int16).astype(np.float64)**2))
+                # Apply wind filter if enabled
+                filtered_data = self.apply_wind_filter(data)
+                
+                # Calculate dB level on filtered data
+                db_level = self.calculate_db(filtered_data)
+                rms = np.sqrt(np.mean(np.frombuffer(filtered_data, dtype=np.int16).astype(np.float64)**2))
                 
                 # Emit level update
                 self.level_updated.emit(rms, db_level)
                 
-                # Add to current segment
-                self.current_segment.append(data)
+                # Add filtered data to current segment
+                self.current_segment.append(filtered_data)
                 
-                # Maintain ring buffer for pre-event context
-                self.audio_ring_buffer.append(data)
+                # Maintain ring buffer for pre-event context (use filtered data)
+                self.audio_ring_buffer.append(filtered_data)
                 if len(self.audio_ring_buffer) > self.max_ring_buffer_samples:
                     self.audio_ring_buffer.pop(0)
                 
@@ -490,8 +547,8 @@ class AudioProcessor(QObject):
                         self.event_in_progress = True
                         self.event_start_time = datetime.now()
                         self.event_peak_db = db_level
-                        # Include audio from ring buffer for context
-                        self.event_samples = list(self.audio_ring_buffer) + [data]
+                        # Include audio from ring buffer for context (already filtered)
+                        self.event_samples = list(self.audio_ring_buffer) + [filtered_data]
                         
                         # Start video recording if enabled
                         if self.video_enabled:
@@ -500,7 +557,7 @@ class AudioProcessor(QObject):
                     else:
                         # Continue event
                         self.event_peak_db = max(self.event_peak_db, db_level)
-                        self.event_samples.append(data)
+                        self.event_samples.append(filtered_data)
                         
                         # Write video frame if recording
                         if self.video_writer is not None:
@@ -515,7 +572,7 @@ class AudioProcessor(QObject):
                         if self.video_writer is not None:
                             self.write_video_frame()
                         post_event_counter += 1
-                        self.event_samples.append(data)
+                        self.event_samples.append(filtered_data)
                         
                         # Check if we've collected enough post-event samples
                         post_event_samples_needed = int(self.post_event_buffer_seconds * self.device_sample_rate / CHUNK)
@@ -1396,6 +1453,66 @@ class SoundMonitorApp(QMainWindow):
         device_group.setLayout(device_layout)
         layout.addWidget(device_group)
         
+        # Wind noise filter settings
+        wind_filter_group = QGroupBox("🌬️ Wind Noise Filter")
+        wind_filter_layout = QVBoxLayout()
+        
+        # Information about wind filtering
+        wind_info = QLabel(
+            "<b>Reduce wind noise interference:</b><br>"
+            "Wind noise typically appears at very low frequencies (below 80 Hz).<br>"
+            "This filter removes low-frequency content to reduce false alarms from wind.<br>"
+            "<br><i>Note: Enabling this filter may also reduce detection of very low-frequency sounds like distant traffic.</i>"
+        )
+        wind_info.setWordWrap(True)
+        wind_filter_layout.addWidget(wind_info)
+        
+        # Enable/disable wind filter
+        self.wind_filter_checkbox = QCheckBox("Enable Wind Noise Filter")
+        self.wind_filter_checkbox.setChecked(False)
+        self.wind_filter_checkbox.stateChanged.connect(self.on_wind_filter_changed)
+        wind_filter_layout.addWidget(self.wind_filter_checkbox)
+        
+        # Cutoff frequency control
+        cutoff_layout = QHBoxLayout()
+        cutoff_layout.addWidget(QLabel("Filter Cutoff Frequency (Hz):"))
+        self.wind_cutoff_spinbox = QSpinBox()
+        self.wind_cutoff_spinbox.setMinimum(40)
+        self.wind_cutoff_spinbox.setMaximum(200)
+        self.wind_cutoff_spinbox.setValue(80)
+        self.wind_cutoff_spinbox.setSingleStep(10)
+        self.wind_cutoff_spinbox.valueChanged.connect(self.on_wind_cutoff_changed)
+        cutoff_layout.addWidget(self.wind_cutoff_spinbox)
+        
+        # Add preset buttons
+        preset_60 = QPushButton("60 Hz")
+        preset_60.clicked.connect(lambda: self.wind_cutoff_spinbox.setValue(60))
+        cutoff_layout.addWidget(preset_60)
+        
+        preset_80 = QPushButton("80 Hz")
+        preset_80.clicked.connect(lambda: self.wind_cutoff_spinbox.setValue(80))
+        cutoff_layout.addWidget(preset_80)
+        
+        preset_100 = QPushButton("100 Hz")
+        preset_100.clicked.connect(lambda: self.wind_cutoff_spinbox.setValue(100))
+        cutoff_layout.addWidget(preset_100)
+        
+        cutoff_layout.addStretch()
+        wind_filter_layout.addLayout(cutoff_layout)
+        
+        # Help text for cutoff frequency
+        cutoff_help = QLabel(
+            "<i>Lower values (60 Hz): More aggressive filtering, better wind reduction<br>"
+            "Higher values (100 Hz): Less aggressive, preserves more low-frequency sounds<br>"
+            "Recommended: 80 Hz for outdoor use, 60 Hz for very windy conditions</i>"
+        )
+        cutoff_help.setWordWrap(True)
+        cutoff_help.setStyleSheet("font-size: 9pt; color: #666;")
+        wind_filter_layout.addWidget(cutoff_help)
+        
+        wind_filter_group.setLayout(wind_filter_layout)
+        layout.addWidget(wind_filter_group)
+        
         # Camera settings (if available)
         if CV2_AVAILABLE:
             camera_group = QGroupBox("📹 Video Recording Settings")
@@ -1505,6 +1622,15 @@ class SoundMonitorApp(QMainWindow):
     def on_calibration_changed(self, value):
         """Handle calibration offset change"""
         self.audio_processor.set_calibration(value)
+    
+    def on_wind_filter_changed(self, state):
+        """Handle wind filter checkbox change"""
+        enabled = (state == Qt.Checked)
+        self.audio_processor.set_wind_filter(enabled)
+    
+    def on_wind_cutoff_changed(self, value):
+        """Handle wind filter cutoff frequency change"""
+        self.audio_processor.set_wind_filter_cutoff(value)
     
     def on_camera_changed(self, index):
         """Handle camera selection change"""
