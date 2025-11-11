@@ -2,7 +2,8 @@
 
 A comprehensive application for monitoring, recording, and documenting noise pollution to present evidence to city councils or other authorities.
 
-![Sound Monitor Application](screenshot.png)
+<img width="672" height="449" alt="image" src="https://github.com/user-attachments/assets/1aec8be2-3b0e-4c67-8a7b-dc6f8a29e07e" />
+
 
 ## Features
 
@@ -43,7 +44,7 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 - **System Status**: Battery and resource monitoring for outdoor deployment
 - **Non-Intrusive Notifications**: Visual notification panel for extreme events (no popups!)
 
-## Installation
+
 
 ### Requirements
 - Python 3.7 or higher
@@ -73,75 +74,14 @@ brew install portaudio ffmpeg
 pip install -r requirements.txt
 ```
 
-Or install manually:
-```bash
-pip install PyQt5 pyaudio pydub numpy matplotlib scipy
-```
-
-### Optional Dependencies
-
-For system monitoring features (battery status, CPU/memory usage):
-```bash
-pip install psutil
-```
 
 ## Usage
 
 ### Starting the Application
 
 ```bash
-python sound_monitor.py
+python run.py
 ```
-
-### Quick Start Guide
-
-1. **Select Your Microphone**
-   - Choose your input device from the dropdown menu
-   - The application will list all available input devices
-
-2. **Calibrate (Optional but Recommended)**
-   - Go to the Settings tab
-   - Use a calibrated sound level meter as reference
-   - Adjust the calibration offset until readings match
-
-3. **Set Detection Threshold**
-   - Use the threshold slider to set your desired sensitivity
-   - Typical values: 60-70 dB for general noise, 80-90 dB for loud events
-   - Green: quiet, Yellow: moderate, Orange: loud, Red: very loud
-
-4. **Start Recording**
-   - Click "Start Recording" button (green)
-   - The button turns red while recording
-   - Live waveform and dB meter update in real-time
-
-5. **Monitor Events**
-   - Switch to "Event Log" tab to see detected events
-   - Events are automatically logged when sound exceeds threshold
-   - Filter by minimum dB to focus on louder events
-
-6. **Review and Export**
-   - Double-click any event to play the audio
-   - Click "Export to CSV" to create a report
-   - Use exported data for presentations to city council
-
-### Best Practices
-
-**For Outdoor Deployment:**
-- Use a laptop with good battery life
-- Place microphone in weather-protected location
-- Check "System Status" tab for battery monitoring
-- Consider using an external USB microphone for better quality
-
-**For Evidence Collection:**
-- Calibrate your microphone for accurate dB readings
-- Set threshold just above normal ambient noise (e.g., 70 dB)
-- Let the system run continuously for several days/weeks
-- Export logs with timestamp and dB data for official presentations
-
-**Storage Management:**
-- Monitor the Settings tab for storage usage
-- With 70GB available and 64kbps MP3, you can record approximately 50+ days
-- Older recordings can be backed up and deleted to free space
 
 ## File Organization
 
@@ -195,22 +135,9 @@ If you see `qt.qpa.plugin: Could not load the Qt platform plugin "xcb"`:
 - **dB Calculation**: RMS-based, referenced to max int16 value, calibrated to ~94 dB SPL
 - **Low-Frequency Detection**: FFT-based, 20-200 Hz range, >40% energy threshold
 
-## Contributing
-
-Contributions are welcome! Areas for enhancement:
-- Support for stereo recording
-- Advanced frequency analysis and filtering
-- Cloud backup integration
-- Mobile app companion
-- Machine learning for noise source classification
-
 ## License
 
 MIT License - See LICENSE file for details
-
-## Author
-
-Created to document noise pollution and help residents get a good night's sleep.
 
 ## Support
 
