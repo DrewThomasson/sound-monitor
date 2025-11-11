@@ -6,10 +6,11 @@ A comprehensive application for monitoring, recording, and documenting noise pol
 
 
 ## GUI
-<img width="1496" height="854" alt="Screenshot_20251110_211147" src="https://github.com/user-attachments/assets/dcefb6eb-4419-4408-b60b-a959c838b871" />
-<img width="1496" height="854" alt="Screenshot_20251110_211240" src="https://github.com/user-attachments/assets/f3c1c68a-1311-461d-b54b-0fcb433e59a4" />
-<img width="1496" height="854" alt="Screenshot_20251110_211408" src="https://github.com/user-attachments/assets/29847413-8c6e-43f0-89df-2e62535504ef" />
-<img width="1496" height="854" alt="Screenshot_20251110_211444" src="https://github.com/user-attachments/assets/d58fc2e6-6abe-4934-abd7-059c0d4107e9" />
+
+| | |
+|---|---|
+| <img width="748" height="427" alt="Screenshot_20251110_211147" src="https://github.com/user-attachments/assets/dcefb6eb-4419-4408-b60b-a959c838b871" /> | <img width="748" height="427" alt="Screenshot_20251110_211240" src="https://github.com/user-attachments/assets/f3c1c68a-1311-461d-b54b-0fcb433e59a4" /> |
+| <img width="748" height="427" alt="Screenshot_20251110_211408" src="https://github.com/user-attachments/assets/29847413-8c6e-43f0-89df-2e62535504ef" /> | <img width="748" height="427" alt="Screenshot_20251110_211444" src="https://github.com/user-attachments/assets/d58fc2e6-6abe-4934-abd7-059c0d4107e9" /> |
 
 
 
