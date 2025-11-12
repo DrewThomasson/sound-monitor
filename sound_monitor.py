@@ -101,8 +101,15 @@ class AudioProcessor(QObject):
         self.camera_index = 0
         self.video_writer = None
         self.video_event_filename = None
+        self.video_temp_filename = None  # Temporary video file (before adding audio)
+        self.video_event_audio_samples = []  # Audio samples for current video event
         self.last_video_frame_time = None  # Track when we last wrote a video frame
         self.video_frame_interval = 1.0 / VIDEO_FPS  # Seconds between frames
+        
+        # Configurable video settings (can be changed via UI)
+        self.video_fps = VIDEO_FPS
+        self.video_width = VIDEO_WIDTH
+        self.video_height = VIDEO_HEIGHT
         
         # Create recordings and videos directories
         Path(RECORDINGS_DIR).mkdir(exist_ok=True)
@@ -187,20 +194,25 @@ class AudioProcessor(QObject):
             return None
         
         try:
-            # Create video filename
+            # Create temporary video filename (without audio)
+            video_temp_filename = os.path.join(VIDEOS_DIR, f"event_{event_timestamp}_temp.mp4")
             video_filename = os.path.join(VIDEOS_DIR, f"event_{event_timestamp}.mp4")
             
-            # Initialize video writer
+            # Initialize video writer with current settings
             fourcc = cv2.VideoWriter_fourcc(*VIDEO_CODEC)
-            out = cv2.VideoWriter(video_filename, fourcc, VIDEO_FPS, (VIDEO_WIDTH, VIDEO_HEIGHT))
+            out = cv2.VideoWriter(video_temp_filename, fourcc, self.video_fps, 
+                                (self.video_width, self.video_height))
             
             if not out.isOpened():
                 self.error_occurred.emit("Cannot create video writer")
                 return None
             
             self.video_writer = out
+            self.video_temp_filename = video_temp_filename
             self.video_event_filename = video_filename
+            self.video_event_audio_samples = []  # Reset audio samples for this event
             self.last_video_frame_time = time.time()  # Initialize frame timing
+            self.video_frame_interval = 1.0 / self.video_fps  # Update interval based on current FPS
             
             return video_filename
         except Exception as e:
@@ -232,7 +244,7 @@ class AudioProcessor(QObject):
             self.error_occurred.emit(f"Error writing video frame: {str(e)}")
     
     def stop_video_recording(self):
-        """Stop recording video and cleanup"""
+        """Stop recording video and combine with audio"""
         if self.video_writer is not None:
             try:
                 self.video_writer.release()
@@ -240,10 +252,73 @@ class AudioProcessor(QObject):
                 pass
             self.video_writer = None
         
-        filename = self.video_event_filename
+        final_filename = self.video_event_filename
+        temp_filename = self.video_temp_filename
+        
+        # Combine video with audio if we have audio samples
+        if temp_filename and os.path.exists(temp_filename) and self.video_event_audio_samples:
+            try:
+                # Save audio to temporary WAV file
+                audio_temp_filename = temp_filename.replace('.mp4', '_audio.wav')
+                audio_data = b''.join(self.video_event_audio_samples)
+                
+                with wave.open(audio_temp_filename, 'wb') as wf:
+                    wf.setnchannels(CHANNELS)
+                    wf.setsampwidth(2)  # 16-bit
+                    wf.setframerate(self.device_sample_rate)
+                    wf.writeframes(audio_data)
+                
+                # Use ffmpeg to combine video and audio
+                import subprocess
+                cmd = [
+                    'ffmpeg', '-y',  # Overwrite output file
+                    '-i', temp_filename,  # Video input
+                    '-i', audio_temp_filename,  # Audio input
+                    '-c:v', 'copy',  # Copy video codec (no re-encode)
+                    '-c:a', 'aac',  # Use AAC for audio
+                    '-shortest',  # End when shortest input ends
+                    final_filename
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    # Success - clean up temp files
+                    try:
+                        os.remove(temp_filename)
+                        os.remove(audio_temp_filename)
+                    except:
+                        pass
+                else:
+                    # Failed - keep temp video without audio
+                    self.error_occurred.emit(f"Failed to add audio to video: {result.stderr[:100]}")
+                    if os.path.exists(temp_filename):
+                        os.rename(temp_filename, final_filename)
+                    try:
+                        os.remove(audio_temp_filename)
+                    except:
+                        pass
+                        
+            except Exception as e:
+                self.error_occurred.emit(f"Error combining video with audio: {str(e)}")
+                # Keep temp video without audio
+                if temp_filename and os.path.exists(temp_filename):
+                    try:
+                        os.rename(temp_filename, final_filename)
+                    except:
+                        pass
+        elif temp_filename and os.path.exists(temp_filename):
+            # No audio or audio not available - just rename temp file
+            try:
+                os.rename(temp_filename, final_filename)
+            except:
+                pass
+        
         self.video_event_filename = None
+        self.video_temp_filename = None
+        self.video_event_audio_samples = []
         self.last_video_frame_time = None  # Reset frame timing
-        return filename
+        return final_filename
     
     def detect_sample_rate(self, device_index):
         """Detect the best supported sample rate for a device"""
@@ -509,10 +584,16 @@ class AudioProcessor(QObject):
                         if self.video_enabled:
                             timestamp = self.event_start_time.strftime("%Y%m%d_%H%M%S_%f")
                             self.start_video_recording(timestamp)
+                            # Also capture audio for video
+                            self.video_event_audio_samples = list(self.audio_ring_buffer) + [data]
                     else:
                         # Continue event
                         self.event_peak_db = max(self.event_peak_db, db_level)
                         self.event_samples.append(data)
+                        
+                        # Capture audio for video if recording
+                        if self.video_writer is not None:
+                            self.video_event_audio_samples.append(data)
                         
                         # Write video frame if recording
                         if self.video_writer is not None:
@@ -522,6 +603,10 @@ class AudioProcessor(QObject):
                 else:
                     if self.event_in_progress:
                         # Continue collecting audio for post-event buffer
+                        
+                        # Capture audio for video if recording
+                        if self.video_writer is not None:
+                            self.video_event_audio_samples.append(data)
                         
                         # Continue writing video frames during post-event buffer
                         if self.video_writer is not None:
@@ -836,14 +921,20 @@ class StatisticsWidget(QWidget):
 class CameraPreviewWidget(QLabel):
     """Widget for displaying live camera preview"""
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, audio_processor=None):
         super().__init__(parent)
+        self.audio_processor = audio_processor
         self.camera_index = 0
         self.capture = None
         self.timer = None
         self.current_frame = None  # Store current frame for video recording
-        self.setMinimumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
-        self.setMaximumSize(VIDEO_WIDTH, VIDEO_HEIGHT)
+        
+        # Get initial size from audio processor if available, otherwise use defaults
+        width = audio_processor.video_width if audio_processor else VIDEO_WIDTH
+        height = audio_processor.video_height if audio_processor else VIDEO_HEIGHT
+        
+        self.setMinimumSize(width, height)
+        self.setMaximumSize(width, height)
         self.setScaledContents(True)
         self.setStyleSheet("QLabel { background-color: black; border: 2px solid gray; }")
         self.setText("No Camera")
@@ -871,14 +962,19 @@ class CameraPreviewWidget(QLabel):
                 self.setText(f"Cannot open camera {camera_index}")
                 return
             
+            # Get camera properties from audio processor if available
+            width = self.audio_processor.video_width if self.audio_processor else VIDEO_WIDTH
+            height = self.audio_processor.video_height if self.audio_processor else VIDEO_HEIGHT
+            fps = self.audio_processor.video_fps if self.audio_processor else VIDEO_FPS
+            
             # Set camera properties
-            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH)
-            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT)
+            self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+            self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
             
             # Start timer to update frames
             self.timer = QTimer(self)
             self.timer.timeout.connect(self.update_frame)
-            self.timer.start(int(1000 / VIDEO_FPS))  # Update at VIDEO_FPS
+            self.timer.start(int(1000 / fps))  # Update at configured FPS
         except Exception as e:
             self.setText(f"Error: {str(e)}")
     
@@ -1085,7 +1181,7 @@ class SoundMonitorApp(QMainWindow):
         if CV2_AVAILABLE:
             camera_group = QGroupBox("📹 Camera Preview")
             camera_layout = QVBoxLayout()
-            self.camera_preview = CameraPreviewWidget()
+            self.camera_preview = CameraPreviewWidget(audio_processor=self.audio_processor)
             camera_layout.addWidget(self.camera_preview)
             
             # Connect camera preview to audio processor for video recording
@@ -1433,14 +1529,63 @@ class SoundMonitorApp(QMainWindow):
             camera_select_layout.addStretch()
             camera_layout.addLayout(camera_select_layout)
             
+            # Video resolution settings
+            resolution_layout = QHBoxLayout()
+            resolution_layout.addWidget(QLabel("Resolution:"))
+            self.video_width_spinbox = QSpinBox()
+            self.video_width_spinbox.setMinimum(320)
+            self.video_width_spinbox.setMaximum(1920)
+            self.video_width_spinbox.setValue(VIDEO_WIDTH)
+            self.video_width_spinbox.setSingleStep(160)
+            self.video_width_spinbox.setSuffix(" px")
+            self.video_width_spinbox.valueChanged.connect(self.on_video_settings_changed)
+            resolution_layout.addWidget(self.video_width_spinbox)
+            resolution_layout.addWidget(QLabel("×"))
+            self.video_height_spinbox = QSpinBox()
+            self.video_height_spinbox.setMinimum(240)
+            self.video_height_spinbox.setMaximum(1080)
+            self.video_height_spinbox.setValue(VIDEO_HEIGHT)
+            self.video_height_spinbox.setSingleStep(120)
+            self.video_height_spinbox.setSuffix(" px")
+            self.video_height_spinbox.valueChanged.connect(self.on_video_settings_changed)
+            resolution_layout.addWidget(self.video_height_spinbox)
+            
+            # Quick resolution presets
+            preset_480p = QPushButton("480p")
+            preset_480p.clicked.connect(lambda: self.set_video_resolution(640, 480))
+            resolution_layout.addWidget(preset_480p)
+            preset_720p = QPushButton("720p")
+            preset_720p.clicked.connect(lambda: self.set_video_resolution(1280, 720))
+            resolution_layout.addWidget(preset_720p)
+            preset_1080p = QPushButton("1080p")
+            preset_1080p.clicked.connect(lambda: self.set_video_resolution(1920, 1080))
+            resolution_layout.addWidget(preset_1080p)
+            
+            resolution_layout.addStretch()
+            camera_layout.addLayout(resolution_layout)
+            
+            # FPS settings
+            fps_layout = QHBoxLayout()
+            fps_layout.addWidget(QLabel("Frame Rate:"))
+            self.video_fps_spinbox = QSpinBox()
+            self.video_fps_spinbox.setMinimum(5)
+            self.video_fps_spinbox.setMaximum(60)
+            self.video_fps_spinbox.setValue(VIDEO_FPS)
+            self.video_fps_spinbox.setSingleStep(5)
+            self.video_fps_spinbox.setSuffix(" FPS")
+            self.video_fps_spinbox.valueChanged.connect(self.on_video_settings_changed)
+            fps_layout.addWidget(self.video_fps_spinbox)
+            fps_layout.addStretch()
+            camera_layout.addLayout(fps_layout)
+            
             # Info about video settings
-            video_info = QLabel(
-                f"<i>Video: {VIDEO_WIDTH}x{VIDEO_HEIGHT} @ {VIDEO_FPS} FPS<br>"
+            self.video_info_label = QLabel(
+                f"<i>Videos include audio from microphone<br>"
                 "Videos only recorded during loud events to save storage<br>"
-                "Approx. 5-10 MB per minute of event video</i>"
+                "Storage: ~5-10 MB per minute depending on resolution and FPS</i>"
             )
-            video_info.setWordWrap(True)
-            camera_layout.addWidget(video_info)
+            self.video_info_label.setWordWrap(True)
+            camera_layout.addWidget(self.video_info_label)
             
             camera_group.setLayout(camera_layout)
             layout.addWidget(camera_group)
@@ -1542,6 +1687,40 @@ class SoundMonitorApp(QMainWindow):
                 self.camera_preview.start_preview(camera_index)
             else:
                 self.camera_preview.stop_preview()
+    
+    def on_video_settings_changed(self):
+        """Handle video settings (resolution/FPS) changes"""
+        if not hasattr(self, 'video_width_spinbox'):
+            return
+        
+        width = self.video_width_spinbox.value()
+        height = self.video_height_spinbox.value()
+        fps = self.video_fps_spinbox.value()
+        
+        # Update audio processor settings
+        self.audio_processor.video_width = width
+        self.audio_processor.video_height = height
+        self.audio_processor.video_fps = fps
+        self.audio_processor.video_frame_interval = 1.0 / fps
+        
+        # Update camera preview resolution
+        if hasattr(self, 'camera_preview') and self.camera_preview.capture is not None:
+            try:
+                self.camera_preview.capture.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+                self.camera_preview.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
+                # Update camera preview widget size
+                self.camera_preview.setMinimumSize(width, height)
+                self.camera_preview.setMaximumSize(width, height)
+            except:
+                pass
+    
+    def set_video_resolution(self, width, height):
+        """Set video resolution from preset"""
+        if not hasattr(self, 'video_width_spinbox'):
+            return
+        
+        self.video_width_spinbox.setValue(width)
+        self.video_height_spinbox.setValue(height)
     
     def on_level_updated(self, rms, db_level):
         """Handle audio level update"""
