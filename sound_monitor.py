@@ -101,6 +101,8 @@ class AudioProcessor(QObject):
         self.camera_index = 0
         self.video_writer = None
         self.video_event_filename = None
+        self.last_video_frame_time = None  # Track when we last wrote a video frame
+        self.video_frame_interval = 1.0 / VIDEO_FPS  # Seconds between frames
         
         # Create recordings and videos directories
         Path(RECORDINGS_DIR).mkdir(exist_ok=True)
@@ -198,6 +200,7 @@ class AudioProcessor(QObject):
             
             self.video_writer = out
             self.video_event_filename = video_filename
+            self.last_video_frame_time = time.time()  # Initialize frame timing
             
             return video_filename
         except Exception as e:
@@ -212,11 +215,19 @@ class AudioProcessor(QObject):
         if not hasattr(self, 'camera_widget') or self.camera_widget is None:
             return
         
+        # Check if enough time has passed since the last frame
+        current_time = time.time()
+        if self.last_video_frame_time is not None:
+            time_since_last_frame = current_time - self.last_video_frame_time
+            if time_since_last_frame < self.video_frame_interval:
+                return  # Skip this frame, not enough time has passed
+        
         try:
             # Get frame from camera preview widget (shared camera)
             frame = self.camera_widget.get_current_frame()
             if frame is not None:
                 self.video_writer.write(frame)
+                self.last_video_frame_time = current_time  # Update last frame time
         except Exception as e:
             self.error_occurred.emit(f"Error writing video frame: {str(e)}")
     
@@ -231,6 +242,7 @@ class AudioProcessor(QObject):
         
         filename = self.video_event_filename
         self.video_event_filename = None
+        self.last_video_frame_time = None  # Reset frame timing
         return filename
     
     def detect_sample_rate(self, device_index):
