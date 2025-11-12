@@ -272,10 +272,15 @@ class AudioProcessor(QObject):
                 import subprocess
                 cmd = [
                     'ffmpeg', '-y',  # Overwrite output file
+                    '-r', str(self.video_fps),  # Set input video framerate
                     '-i', temp_filename,  # Video input
                     '-i', audio_temp_filename,  # Audio input
-                    '-c:v', 'copy',  # Copy video codec (no re-encode)
+                    '-c:v', 'libx264',  # Use H.264 codec for better compatibility
+                    '-preset', 'ultrafast',  # Fast encoding
                     '-c:a', 'aac',  # Use AAC for audio
+                    '-b:a', '128k',  # Audio bitrate
+                    '-af', 'aresample=async=1',  # Resample audio for sync
+                    '-vsync', 'vfr',  # Variable frame rate for better sync
                     '-shortest',  # End when shortest input ends
                     final_filename
                 ]
