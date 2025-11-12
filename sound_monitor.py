@@ -101,8 +101,8 @@ class AudioProcessor(QObject):
         self.camera_index = 0
         self.video_writer = None
         self.video_event_filename = None
-        self.video_temp_filename = None  # Temporary video file (before adding audio)
-        self.video_event_audio_samples = []  # Audio samples for current video event
+        self.video_audio_file = None  # WAV file handle for recording audio alongside video
+        self.video_audio_filename = None  # Path to audio file
         self.last_video_frame_time = None  # Track when we last wrote a video frame
         self.video_frame_interval = 1.0 / VIDEO_FPS  # Seconds between frames
         
@@ -185,7 +185,7 @@ class AudioProcessor(QObject):
         self.camera_widget = camera_widget
     
     def start_video_recording(self, event_timestamp):
-        """Start recording video for an event"""
+        """Start recording video and audio to separate files"""
         if not self.video_enabled or not CV2_AVAILABLE:
             return None
         
@@ -194,11 +194,12 @@ class AudioProcessor(QObject):
             return None
         
         try:
-            # Create temporary video filename (without audio)
+            # Create video and audio filenames
             video_temp_filename = os.path.join(VIDEOS_DIR, f"event_{event_timestamp}_temp.mp4")
+            audio_temp_filename = os.path.join(VIDEOS_DIR, f"event_{event_timestamp}_temp.wav")
             video_filename = os.path.join(VIDEOS_DIR, f"event_{event_timestamp}.mp4")
             
-            # Initialize video writer with current settings
+            # Initialize video writer (video only, no audio)
             fourcc = cv2.VideoWriter_fourcc(*VIDEO_CODEC)
             out = cv2.VideoWriter(video_temp_filename, fourcc, self.video_fps, 
                                 (self.video_width, self.video_height))
@@ -207,12 +208,19 @@ class AudioProcessor(QObject):
                 self.error_occurred.emit("Cannot create video writer")
                 return None
             
+            # Open WAV file for audio recording
+            audio_file = wave.open(audio_temp_filename, 'wb')
+            audio_file.setnchannels(CHANNELS)
+            audio_file.setsampwidth(2)  # 16-bit
+            audio_file.setframerate(self.device_sample_rate)
+            
             self.video_writer = out
+            self.video_audio_file = audio_file
+            self.video_audio_filename = audio_temp_filename
             self.video_temp_filename = video_temp_filename
             self.video_event_filename = video_filename
-            self.video_event_audio_samples = []  # Reset audio samples for this event
-            self.last_video_frame_time = time.time()  # Initialize frame timing
-            self.video_frame_interval = 1.0 / self.video_fps  # Update interval based on current FPS
+            self.last_video_frame_time = time.time()
+            self.video_frame_interval = 1.0 / self.video_fps
             
             return video_filename
         except Exception as e:
@@ -220,7 +228,7 @@ class AudioProcessor(QObject):
             return None
     
     def write_video_frame(self):
-        """Capture and write a single video frame from camera preview"""
+        """Capture and write a single video frame"""
         if self.video_writer is None:
             return
         
@@ -243,8 +251,17 @@ class AudioProcessor(QObject):
         except Exception as e:
             self.error_occurred.emit(f"Error writing video frame: {str(e)}")
     
+    def write_video_audio(self, audio_data):
+        """Write audio data to video's WAV file"""
+        if self.video_audio_file is not None:
+            try:
+                self.video_audio_file.writeframes(audio_data)
+            except Exception as e:
+                self.error_occurred.emit(f"Error writing video audio: {str(e)}")
+    
     def stop_video_recording(self):
-        """Stop recording video and combine with audio"""
+        """Stop recording video and audio, then combine them"""
+        # Close video writer
         if self.video_writer is not None:
             try:
                 self.video_writer.release()
@@ -252,77 +269,72 @@ class AudioProcessor(QObject):
                 pass
             self.video_writer = None
         
-        final_filename = self.video_event_filename
-        temp_filename = self.video_temp_filename
-        
-        # Combine video with audio if we have audio samples
-        if temp_filename and os.path.exists(temp_filename) and self.video_event_audio_samples:
+        # Close audio file
+        if self.video_audio_file is not None:
             try:
-                # Save audio to temporary WAV file
-                audio_temp_filename = temp_filename.replace('.mp4', '_audio.wav')
-                audio_data = b''.join(self.video_event_audio_samples)
-                
-                with wave.open(audio_temp_filename, 'wb') as wf:
-                    wf.setnchannels(CHANNELS)
-                    wf.setsampwidth(2)  # 16-bit
-                    wf.setframerate(self.device_sample_rate)
-                    wf.writeframes(audio_data)
-                
-                # Use ffmpeg to combine video and audio
+                self.video_audio_file.close()
+            except:
+                pass
+            self.video_audio_file = None
+        
+        final_filename = self.video_event_filename
+        temp_video = self.video_temp_filename
+        temp_audio = self.video_audio_filename
+        
+        # Combine video and audio using ffmpeg
+        if temp_video and temp_audio and os.path.exists(temp_video) and os.path.exists(temp_audio):
+            try:
                 import subprocess
                 cmd = [
-                    'ffmpeg', '-y',  # Overwrite output file
-                    '-r', str(self.video_fps),  # Set input video framerate
-                    '-i', temp_filename,  # Video input
-                    '-i', audio_temp_filename,  # Audio input
-                    '-c:v', 'libx264',  # Use H.264 codec for better compatibility
-                    '-preset', 'ultrafast',  # Fast encoding
-                    '-c:a', 'aac',  # Use AAC for audio
+                    'ffmpeg', '-y',
+                    '-i', temp_video,  # Video input
+                    '-i', temp_audio,  # Audio input
+                    '-c:v', 'copy',  # Copy video stream (no re-encode)
+                    '-c:a', 'aac',  # Encode audio to AAC
                     '-b:a', '128k',  # Audio bitrate
-                    '-af', 'aresample=async=1',  # Resample audio for sync
-                    '-vsync', 'vfr',  # Variable frame rate for better sync
-                    '-shortest',  # End when shortest input ends
+                    '-shortest',  # Match shortest stream
                     final_filename
                 ]
                 
-                result = subprocess.run(cmd, capture_output=True, text=True)
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
                 
                 if result.returncode == 0:
                     # Success - clean up temp files
                     try:
-                        os.remove(temp_filename)
-                        os.remove(audio_temp_filename)
+                        os.remove(temp_video)
+                        os.remove(temp_audio)
                     except:
                         pass
                 else:
-                    # Failed - keep temp video without audio
-                    self.error_occurred.emit(f"Failed to add audio to video: {result.stderr[:100]}")
-                    if os.path.exists(temp_filename):
-                        os.rename(temp_filename, final_filename)
-                    try:
-                        os.remove(audio_temp_filename)
-                    except:
-                        pass
-                        
+                    # Failed - keep video without audio
+                    self.error_occurred.emit(f"Failed to combine video+audio: {result.stderr[:200]}")
+                    if os.path.exists(temp_video):
+                        try:
+                            os.rename(temp_video, final_filename)
+                            os.remove(temp_audio)
+                        except:
+                            pass
             except Exception as e:
-                self.error_occurred.emit(f"Error combining video with audio: {str(e)}")
-                # Keep temp video without audio
-                if temp_filename and os.path.exists(temp_filename):
+                self.error_occurred.emit(f"Error combining video+audio: {str(e)}")
+                # Keep video without audio
+                if temp_video and os.path.exists(temp_video):
                     try:
-                        os.rename(temp_filename, final_filename)
+                        os.rename(temp_video, final_filename)
+                        if temp_audio and os.path.exists(temp_audio):
+                            os.remove(temp_audio)
                     except:
                         pass
-        elif temp_filename and os.path.exists(temp_filename):
-            # No audio or audio not available - just rename temp file
+        elif temp_video and os.path.exists(temp_video):
+            # No audio file - just rename video
             try:
-                os.rename(temp_filename, final_filename)
+                os.rename(temp_video, final_filename)
             except:
                 pass
         
         self.video_event_filename = None
         self.video_temp_filename = None
-        self.video_event_audio_samples = []
-        self.last_video_frame_time = None  # Reset frame timing
+        self.video_audio_filename = None
+        self.last_video_frame_time = None
         return final_filename
     
     def detect_sample_rate(self, device_index):
@@ -589,16 +601,19 @@ class AudioProcessor(QObject):
                         if self.video_enabled:
                             timestamp = self.event_start_time.strftime("%Y%m%d_%H%M%S_%f")
                             self.start_video_recording(timestamp)
-                            # Also capture audio for video
-                            self.video_event_audio_samples = list(self.audio_ring_buffer) + [data]
+                            # Write pre-event audio to video
+                            if self.video_audio_file is not None:
+                                for audio_chunk in self.audio_ring_buffer:
+                                    self.write_video_audio(audio_chunk)
+                                self.write_video_audio(data)
                     else:
                         # Continue event
                         self.event_peak_db = max(self.event_peak_db, db_level)
                         self.event_samples.append(data)
                         
-                        # Capture audio for video if recording
-                        if self.video_writer is not None:
-                            self.video_event_audio_samples.append(data)
+                        # Write audio for video if recording
+                        if self.video_audio_file is not None:
+                            self.write_video_audio(data)
                         
                         # Write video frame if recording
                         if self.video_writer is not None:
@@ -609,9 +624,9 @@ class AudioProcessor(QObject):
                     if self.event_in_progress:
                         # Continue collecting audio for post-event buffer
                         
-                        # Capture audio for video if recording
-                        if self.video_writer is not None:
-                            self.video_event_audio_samples.append(data)
+                        # Write audio for video if recording
+                        if self.video_audio_file is not None:
+                            self.write_video_audio(data)
                         
                         # Continue writing video frames during post-event buffer
                         if self.video_writer is not None:
