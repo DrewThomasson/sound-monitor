@@ -79,7 +79,7 @@ sound-monitor/
 │   └── temp_*.wav            # Temporary WAV files (cleaned up after MP3 conversion)
 │
 ├── videos/                   # Video recordings directory (created at runtime, optional)
-│   ├── event_YYYYMMDD_HHMMSS_ffffff.mp4   # Video recordings of loud events (if enabled)
+│   ├── event_YYYYMMDD_HHMMSS_ffffff.mp4   # Video recordings of loud events with synchronized audio
 │   └── ...
 │
 └── sound_events.db           # SQLite database with event logs
