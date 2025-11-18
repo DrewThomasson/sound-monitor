@@ -25,6 +25,7 @@ An app for monitoring, recording, and documenting noise pollution to present evi
 
 ### Sound Detection & Logging
 - **Real-time Decibel Monitoring**: Tracks sound levels continuously
+- **Mic Decib Calibration**: Calibrate your connected mic if not reading correct levels 
 - **Low-Frequency Detection**: Specifically identifies low-frequency noise like car rumble (20-200 Hz)
 
 
