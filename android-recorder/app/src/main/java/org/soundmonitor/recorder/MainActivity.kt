@@ -77,6 +77,8 @@ class MainActivity : Activity() {
     /** Turn the camera preview to match the screen (the standard Camera2 TextureView correction). */
     private fun fitPreview(w: Int, h: Int) {
         if (w == 0 || h == 0) return
+        // Below Android 5 the old-camera engine draws the preview already turned upright.
+        if (Build.VERSION.SDK_INT < 21) { preview.setTransform(android.graphics.Matrix()); return }
         @Suppress("DEPRECATION")
         val rot = windowManager.defaultDisplay.rotation
         val m = android.graphics.Matrix()
@@ -107,6 +109,15 @@ class MainActivity : Activity() {
         if (debuggable && intent?.action == RecorderService.ACTION_TEST_EVENT) {
             intent.action = null
             ui.postDelayed({ RecorderService.instance?.testEvent() }, 500)
+        }
+        // Debug builds: "-a export_debug" copies the outbox where adb can read it (some Samsung 4.4 phones break run-as).
+        if (debuggable && intent?.action == "export_debug") {
+            intent.action = null
+            Thread {
+                val dst = getExternalFilesDir("debug") ?: return@Thread
+                dst.deleteRecursively()
+                java.io.File(filesDir, "outbox").copyRecursively(dst, overwrite = true)
+            }.start()
         }
     }
 

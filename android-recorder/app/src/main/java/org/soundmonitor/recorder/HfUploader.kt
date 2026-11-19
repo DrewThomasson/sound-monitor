@@ -104,7 +104,7 @@ class HfUploader(private val repo: String, private val token: String) {
     }
 
     private fun putFile(href: String, f: File, headers: JSONObject?) {
-        val c = URL(href).openConnection() as HttpURLConnection
+        val c = Net.open(href)
         try {
             c.requestMethod = "PUT"
             c.doOutput = true
@@ -122,14 +122,14 @@ class HfUploader(private val repo: String, private val token: String) {
         method: String, url: String, body: String?, contentType: String,
         accept: String = "application/json", extraHeaders: JSONObject? = null,
     ): String {
-        val c = URL(url).openConnection() as HttpURLConnection
+        val c = Net.open(url)
         try {
             c.requestMethod = method
             c.connectTimeout = 30_000
             c.readTimeout = 120_000
             c.setRequestProperty("Authorization", "Bearer $token")
             c.setRequestProperty("Accept", accept)
-            c.setRequestProperty("User-Agent", "street-noise-recorder/1.0")
+            c.setRequestProperty("User-Agent", "street-noise-recorder/${BuildInfo.VERSION}")
             extraHeaders?.keys()?.forEach { k -> c.setRequestProperty(k, extraHeaders.getString(k)) }
             if (body != null) {
                 val bytes = body.toByteArray()
@@ -243,4 +243,5 @@ class UploadJob(private val outbox: File, private val prefs: Prefs, private val 
     }
 }
 
-object BuildInfo { const val VERSION = "1.0" }
+/** Filled in from the installed package when the service starts, so it always matches the app version. */
+object BuildInfo { @Volatile var VERSION = "unknown" }
