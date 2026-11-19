@@ -55,3 +55,4 @@ Thumbs.db
 analysis/.venv/
 analysis/hf_cache/
 analysis/*.log
+analysis/hf_card/analysis/examples/

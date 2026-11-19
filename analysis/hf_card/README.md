@@ -21,6 +21,9 @@ Recorded with [sound-monitor](https://github.com/DrewThomasson/sound-monitor), a
 that records audio around the clock and logs every sound that crosses a loudness threshold as an
 "event", saving a short audio clip and a video of each one.
 
+> **Second site:** recording continues from a 5th-floor porch next door starting November 2026, in
+> [drewThomasson/sound-monitor-porch](https://huggingface.co/datasets/drewThomasson/sound-monitor-porch).
+
 | | |
 |---|---|
 | **Period** | Nov 10, 2025 – Jan 13, 2026 (65 days) |
@@ -70,6 +73,34 @@ Fri Nov 21 (23), New Year's Eve (22) and Fri Dec 5 (22).
 
 ![All loud events by hour and type](analysis/01_events_by_hour.png)
 
+## Listen for yourself
+
+Example events from each group, with the recorded sound merged into each video. Within each group, these are the clips the model was most confident about.
+
+### Loudest nighttime revving (10 PM – 7 AM)
+
+<figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/7678.mp4"></video><figcaption>Wed Dec 24, 10:18 PM · 93.9 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/785.mp4"></video><figcaption>Fri Nov 14, 10:58 PM · 93.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/1365.mp4"></video><figcaption>Tue Nov 18, 12:23 AM · 93.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/2297.mp4"></video><figcaption>Sat Nov 22, 11:51 PM · 93.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/7566.mp4"></video><figcaption>Wed Dec 24, 2:01 AM · 93.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/264.mp4"></video><figcaption>Wed Nov 12, 3:18 AM · 93.8 dB</figcaption></figure>
+
+### Engine revving
+
+<figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/10549.mp4"></video><figcaption>Sat Jan 10, 9:09 PM · 93.6 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/3171.mp4"></video><figcaption>Fri Nov 28, 10:19 PM · 92.3 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/7521.mp4"></video><figcaption>Tue Dec 23, 3:47 PM · 93.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/8248.mp4"></video><figcaption>Sun Dec 28, 9:06 PM · 93.7 dB</figcaption></figure>
+
+### Emergency sirens (excluded from revving)
+
+<figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/2861.mp4"></video><figcaption>Wed Nov 26, 3:04 PM · 93.6 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/1158.mp4"></video><figcaption>Sun Nov 16, 3:16 PM · 93.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/3855.mp4"></video><figcaption>Thu Dec 4, 6:10 PM · 93.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/10314.mp4"></video><figcaption>Fri Jan 9, 6:10 AM · 93.7 dB</figcaption></figure>
+
+### Horns and car alarms
+
+<figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/8180.mp4"></video><figcaption>Sun Dec 28, 8:33 AM · 92.1 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/8179.mp4"></video><figcaption>Sun Dec 28, 8:33 AM · 92.1 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/1181.mp4"></video><figcaption>Sun Nov 16, 6:08 PM · 92.0 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/4685.mp4"></video><figcaption>Wed Dec 10, 1:21 PM · 91.5 dB</figcaption></figure>
+
+### Other vehicle noise
+
+<figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/6755.mp4"></video><figcaption>Thu Dec 18, 1:24 PM · 92.9 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/3701.mp4"></video><figcaption>Wed Dec 3, 1:29 PM · 93.0 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/3818.mp4"></video><figcaption>Thu Dec 4, 12:00 PM · 93.0 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/8198.mp4"></video><figcaption>Sun Dec 28, 12:14 PM · 93.2 dB</figcaption></figure>
+
+### Other sounds
+
+<figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/10391.mp4"></video><figcaption>Fri Jan 9, 3:25 PM · 91.1 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/4341.mp4"></video><figcaption>Sun Dec 7, 3:01 PM · 92.8 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/5393.mp4"></video><figcaption>Sun Dec 14, 6:30 AM · 92.6 dB</figcaption></figure><figure style="display:inline-block;width:300px;margin:0 8px 16px 0;vertical-align:top"><video controls preload="metadata" width="300" src="https://huggingface.co/datasets/drewThomasson/sound-monitor-data/resolve/main/analysis/examples/4787.mp4"></video><figcaption>Thu Dec 11, 5:15 AM · 92.1 dB</figcaption></figure>
+
 ### What the loud events were
 
 | Type | Events | Share |
@@ -115,7 +146,7 @@ sound_events.db                                  SQLite log of every event
 recordings/YYYY-MM-DD/YYYYMMDD_HHMMSS.mp3        continuous 1-minute recordings
 recordings/YYYY-MM-DD/event_<timestamp>.mp3      audio clip of each loud event
 videos/YYYY-MM-DD/event_<timestamp>.mp4          video of each loud event (no audio track)
-analysis/                                        the charts on this page
+analysis/                                        the charts and example videos on this page
 ```
 
 `sound_events.db` has one table, `events`:

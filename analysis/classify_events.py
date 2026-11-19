@@ -88,6 +88,18 @@ def decide(p):
     return "other"
 
 
+def load_audio(path):
+    """16 kHz mono float audio. MP3/WAV via librosa; M4A/MP4 (the Android recorder's clips) via ffmpeg."""
+    import numpy as np
+    if not path.lower().endswith((".m4a", ".mp4")):
+        import librosa
+        return librosa.load(path, sr=16000, mono=True)[0]
+    import subprocess
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", path, "-f", "f32le", "-ac", "1", "-ar", "16000", "-"],
+                         capture_output=True, check=True).stdout
+    return np.frombuffer(raw, dtype=np.float32).copy()
+
+
 def relabel_only(conn):
     """Re-apply thresholds to stored scores without re-running the model."""
     rows = conn.execute("SELECT id, p_siren, p_horn, p_revving, p_vehicle FROM events "
@@ -177,7 +189,7 @@ def main():
             waves, ok = [], []
             for (rid, rel), p in chunk:
                 try:
-                    y, _ = librosa.load(p, sr=16000, mono=True)
+                    y = load_audio(p)
                     if len(y) < 1600:
                         y = np.pad(y, (0, 1600 - len(y)))
                     waves.append(y)
