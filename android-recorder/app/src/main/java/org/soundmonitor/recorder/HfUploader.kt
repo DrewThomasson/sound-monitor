@@ -171,6 +171,7 @@ class UploadJob(private val outbox: File, private val prefs: Prefs, private val 
     fun run(): String {
         val token = prefs.token.trim()
         if (token.isEmpty()) throw HfUploader.HubException("No Hugging Face token set")
+        if (prefs.repo.isBlank()) throw HfUploader.HubException("No Hugging Face dataset set")
         val up = HfUploader(prefs.repo.trim(), token)
         val site = prefs.siteSlug
 
