@@ -175,7 +175,8 @@ class RecorderService : Service() {
         synchronized(this) {
             try { levelWriter?.close() } catch (_: Exception) {}
             levelWriter = null
-            levelFile?.let { finishLevelFile(it) }
+            // Today's log stays .part and is appended to if recording restarts today; finishing it here
+            // would let a second file with the same name overwrite it in the dataset.
             levelFile = null; levelHourKey = ""
         }
         wakeLock?.release(); wakeLock = null
