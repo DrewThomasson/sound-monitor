@@ -1,0 +1,71 @@
+{
+  "date_range": [
+    "2025-11-10 18:43:46.491214",
+    "2026-01-13 22:00:04.172321"
+  ],
+  "days_covered": 65,
+  "total_loud_events": 11291,
+  "events_per_day": 173.7,
+  "night_hours": "22:00-7:00",
+  "events_at_night_all_types": 2850,
+  "classified_events": 11249,
+  "classified_fraction": 0.996,
+  "label_counts_classified": {
+    "vehicle": 6491,
+    "other": 2199,
+    "revving": 1782,
+    "siren": 669,
+    "horn": 108
+  },
+  "label_share_classified": {
+    "vehicle": 0.577,
+    "other": 0.195,
+    "revving": 0.158,
+    "siren": 0.059,
+    "horn": 0.01
+  },
+  "revving_classified": 1782,
+  "revving_at_night_classified": 544,
+  "revving_night_share": 0.305,
+  "sirens_excluded_classified": 669,
+  "peak_db_note": "Levels are from an uncalibrated microphone; compare them to each other, not to legal dBA limits.",
+  "events_without_clip": 42,
+  "revving_peak_db": {
+    "median": 92.6,
+    "max": 93.9
+  },
+  "revving_busiest_hours": {
+    "21:00": 125,
+    "19:00": 120,
+    "22:00": 116,
+    "15:00": 109,
+    "18:00": 108
+  },
+  "revving_by_weekday": {
+    "Mon": 150,
+    "Tue": 188,
+    "Wed": 250,
+    "Thu": 222,
+    "Fri": 248,
+    "Sat": 420,
+    "Sun": 304
+  },
+  "worst_nights": {
+    "2025-11-22": 33,
+    "2025-12-13": 31,
+    "2026-01-10": 29,
+    "2025-11-21": 23,
+    "2025-12-31": 22,
+    "2025-12-05": 22,
+    "2026-01-03": 18,
+    "2026-01-04": 17,
+    "2025-12-12": 16,
+    "2025-12-27": 15
+  },
+  "nights_with_revving": 63,
+  "revving_midnight_to_5am": 270,
+  "revving_on_fri_sat_nights": 282,
+  "monitoring_minutes_recorded": 89400,
+  "monitoring_uptime_pct": 95.5,
+  "revving_per_night_hour_est": 0.97
+}

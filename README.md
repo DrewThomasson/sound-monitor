@@ -9,6 +9,20 @@ An app for monitoring, recording, and documenting noise pollution to present evi
 <img width="672" height="449" alt="image" src="https://github.com/user-attachments/assets/1aec8be2-3b0e-4c67-8a7b-dc6f8a29e07e" />
 
 
+## Example datasets
+
+Real data collected with these tools on a residential street in Atlanta, published on Hugging Face:
+
+| Dataset | Recorded with | What's in it |
+|---|---|---|
+| [**sound-monitor-data**](https://huggingface.co/datasets/drewThomasson/sound-monitor-data) | This desktop app, at street level (Nov 2025 – Jan 2026) | 11,291 loud events with audio and video, the event database, 65 days of 1-minute recordings, plus the analysis: revving vs. siren labels, charts, patterns and playable examples |
+| [**sound-monitor-porch**](https://huggingface.co/datasets/drewThomasson/sound-monitor-porch) | The Android recorder on a 5th-floor porch next door (from Nov 2026) | Event videos with sound, a per-second sound-level log, and recorder health, uploaded twice a day |
+
+## Other tools in this repo
+
+- **[`android-recorder/`](android-recorder/)**: an Android app (Fire tablets and up, Android 5.1+) that records loud events around the clock and uploads them to a Hugging Face dataset on a schedule.
+- **[`analysis/`](analysis/)**: scripts that label each event as revving / vehicle / siren / horn / other with an AudioSet model, so emergency vehicles can be excluded, and build the charts, summary and review pages.
+
 ## GUI
 
 | | |
