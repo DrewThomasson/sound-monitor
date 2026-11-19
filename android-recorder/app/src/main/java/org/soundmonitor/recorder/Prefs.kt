@@ -9,11 +9,11 @@ class Prefs(context: Context) {
         context.applicationContext.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     var site: String
-        get() = sp.getString("site", "porch-5th-floor")!!
+        get() = sp.getString("site", "my-street")!!
         set(v) = sp.edit().putString("site", v).apply()
 
     var repo: String
-        get() = sp.getString("repo", "drewThomasson/sound-monitor-porch")!!
+        get() = sp.getString("repo", "")!!
         set(v) = sp.edit().putString("repo", v).apply()
 
     var token: String
@@ -68,6 +68,11 @@ class Prefs(context: Context) {
     var autoStart: Boolean
         get() = sp.getBoolean("auto_start", true)
         set(v) = sp.edit().putBoolean("auto_start", v).apply()
+
+    /** Whether the first-run explanation has been shown. */
+    var introSeen: Boolean
+        get() = sp.getBoolean("intro_seen", false)
+        set(v) = sp.edit().putBoolean("intro_seen", v).apply()
 
     var lastUploadAttemptMs: Long
         get() = sp.getLong("last_upload_attempt", 0L)
