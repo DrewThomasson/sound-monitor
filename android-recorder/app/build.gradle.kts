@@ -16,10 +16,10 @@ android {
 
     defaultConfig {
         applicationId = "org.soundmonitor.recorder"
-        minSdk = 22          // Fire OS 5 (Android 5.1) and newer
+        minSdk = 21          // Android 5.0 (e.g. Galaxy Note 3) and Fire OS 5 and newer
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     signingConfigs {

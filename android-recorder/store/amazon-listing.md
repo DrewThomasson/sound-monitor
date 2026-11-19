@@ -65,4 +65,4 @@ asked whether the app collects or shares user data, and point to the privacy pol
 
 ## Device support
 
-Fire tablets and Android phones and tablets running Android 5.1 or newer, with a camera and microphone.
+Fire tablets and Android phones and tablets running Android 5.0 or newer, with a camera and microphone.
