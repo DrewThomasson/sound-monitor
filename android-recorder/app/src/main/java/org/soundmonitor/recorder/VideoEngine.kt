@@ -22,7 +22,7 @@ import android.view.Surface
  * encoded frames in [ring]. Clips are cut from the ring after an event, so the video starts a couple
  * of seconds before the noise. An optional preview surface (the status screen) can be attached.
  */
-class VideoEngine(private val context: Context, private val ring: EncodedRing) {
+class VideoEngine(private val context: Context, private val ring: EncodedRing) : VideoSource {
     private val thread = HandlerThread("camera").apply { start() }
     private val handler = Handler(thread.looper)
     private var camera: CameraDevice? = null
@@ -42,7 +42,7 @@ class VideoEngine(private val context: Context, private val ring: EncodedRing) {
      * Rotation to store in each video file so it plays upright (camera sensors are usually mounted
      * sideways). Uses the screen rotation the status screen last saw, plus any manual correction.
      */
-    val rotationDegrees: Int
+    override val rotationDegrees: Int
         get() {
             val p = Prefs(context)
             @Suppress("DEPRECATION")
@@ -55,7 +55,7 @@ class VideoEngine(private val context: Context, private val ring: EncodedRing) {
         }
 
     @SuppressLint("MissingPermission")
-    fun start() {
+    override fun start() {
         if (running) return
         running = true
         handler.post {
@@ -99,10 +99,10 @@ class VideoEngine(private val context: Context, private val ring: EncodedRing) {
         Status.cameraText = "Off"
     }
 
-    fun quit() { stop(); thread.quitSafely() }
+    override fun quit() { stop(); thread.quitSafely() }
 
     /** Attach or detach the on-screen preview. Rebuilds the capture session. */
-    fun setPreview(surface: Surface?) {
+    override fun setPreview(surface: Surface?) {
         handler.post {
             previewSurface = surface
             if (camera != null && running) createSession()

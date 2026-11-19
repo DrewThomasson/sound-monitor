@@ -16,10 +16,10 @@ android {
 
     defaultConfig {
         applicationId = "org.soundmonitor.recorder"
-        minSdk = 21          // Android 5.0 (e.g. Galaxy Note 3) and Fire OS 5 and newer
+        minSdk = 19          // Android 4.4 (experimental: sound + video via the old Camera API, TLS via Conscrypt) and newer
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     signingConfigs {
@@ -44,4 +44,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    // Android 4.4 has no TLS cipher Hugging Face accepts; Conscrypt brings a modern TLS stack (used below Android 5 only).
+    implementation("org.conscrypt:conscrypt-android:2.5.3")
 }

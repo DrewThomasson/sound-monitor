@@ -43,7 +43,7 @@ class RecorderService : Service() {
     private val audioRing = EncodedRing(75_000_000L)
     private val videoRing = EncodedRing(75_000_000L)
     private var audio: AudioEngine? = null
-    private var video: VideoEngine? = null
+    private var video: VideoSource? = null
     private lateinit var detector: EventDetector
     private val clipExecutor = Executors.newSingleThreadExecutor()
     private val uploadExecutor = Executors.newSingleThreadExecutor()
@@ -62,6 +62,7 @@ class RecorderService : Service() {
         super.onCreate()
         instance = this
         prefs = Prefs(this)
+        BuildInfo.VERSION = try { packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown" } catch (_: Exception) { "unknown" }
         store = EventStore(this)
         outbox = File(filesDir, "outbox").apply { mkdirs() }
         tick = Handler(tickThread.looper)
@@ -160,7 +161,8 @@ class RecorderService : Service() {
         eng.start()
         if (prefs.lastUploadAttemptMs == 0L) prefs.lastUploadAttemptMs = System.currentTimeMillis()
         if (videoAllowed()) {
-            video = VideoEngine(this, videoRing).also { it.start() }
+            video = (if (Build.VERSION.SDK_INT >= 21) VideoEngine(this, videoRing) else LegacyVideoEngine(this, videoRing))
+                .also { it.start() }
             pendingPreview?.let { video?.setPreview(it) }
         }
         tick.post(tickRunnable)

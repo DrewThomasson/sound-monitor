@@ -20,7 +20,7 @@ Real data collected with these tools on a residential street in Atlanta, publish
 
 ## Other tools in this repo
 
-- **[`android-recorder/`](android-recorder/)**: an Android app (Fire tablets and Android phones or tablets, Android 5.0+) that records loud events around the clock and uploads them to a Hugging Face dataset on a schedule. **[Download the latest version](https://github.com/DrewThomasson/sound-monitor/releases/latest)** and install it on your tablet ([privacy policy](docs/privacy-policy.md)).
+- **[`android-recorder/`](android-recorder/)**: an Android app (Fire tablets and Android phones or tablets, Android 4.4+, so even old phones from a drawer work) that records loud events around the clock and uploads them to a Hugging Face dataset on a schedule. **[Download the latest version](https://github.com/DrewThomasson/sound-monitor/releases/latest)** and install it on your tablet ([privacy policy](docs/privacy-policy.md)).
 - **[`analysis/`](analysis/)**: scripts that label each event as revving / vehicle / siren / horn / other with an AudioSet model, so emergency vehicles can be excluded, and build the charts, summary and review pages.
 
 ## GUI
