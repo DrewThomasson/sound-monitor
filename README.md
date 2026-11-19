@@ -9,21 +9,13 @@ An app for monitoring, recording, and documenting noise pollution to present evi
 <img width="672" height="449" alt="image" src="https://github.com/user-attachments/assets/1aec8be2-3b0e-4c67-8a7b-dc6f8a29e07e" />
 
 
-## 📱 Android app: turn an old phone or tablet into a noise recorder
+## Android app
 
-**[⬇️ Download Street Noise Recorder for Android](https://github.com/DrewThomasson/sound-monitor/releases/latest)**
+Turn an old Android phone or Fire tablet (Android 4.4+) into a noise recorder that uploads to Hugging Face.
 
-Got a spare Fire tablet or an old Android phone in a drawer? Put it by a window or on a balcony facing the street, plug it in, and it records loud noise around the clock:
+**[Download it here](https://github.com/DrewThomasson/sound-monitor/releases/latest)**
 
-- 🎥 Saves a **video with sound** of every loud event, such as cars revving at night, starting a couple of seconds before the noise
-- 📈 Logs the **sound level every second**, so you can show exactly when it was listening
-- ☁️ **Uploads twice a day** to a Hugging Face dataset in your own account (free), then frees up space on the device
-- 🔋 Runs unattended with the screen off, warns about heat and low storage, and resumes after a restart
-- ♻️ Works on **Android 4.4 and newer**, including Fire tablets and phones from 2013 on, so old devices get reused instead of becoming e-waste
-
-<img width="640" alt="Street Noise Recorder status screen on a Fire tablet" src="android-recorder/store/screenshot-1-status.png" />
-
-Free and open source, with no ads or tracking. Recordings go only to your own Hugging Face account ([privacy policy](docs/privacy-policy.md)). Install steps are in the [release notes](https://github.com/DrewThomasson/sound-monitor/releases/latest). Please point the camera at the street, not into homes, and follow your local recording laws.
+<img width="512" alt="Android app" src="android-recorder/store/screenshot-1-status.png" />
 
 ## Example datasets
 
@@ -39,7 +31,7 @@ Real data collected with these tools on a residential street in Atlanta, publish
 - **[`android-recorder/`](android-recorder/)**: source code of the Android app above.
 - **[`analysis/`](analysis/)**: scripts that label each event as revving / vehicle / siren / horn / other with an AudioSet model, so emergency vehicles can be excluded, and build the charts, summary and review pages.
 
-## Desktop app (Windows, macOS, Linux)
+## GUI
 
 | | |
 |---|---|
