@@ -6,3 +6,4 @@ local.properties
 *.iml
 .kotlin/
 captures/
+release/
