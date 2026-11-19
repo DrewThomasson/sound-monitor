@@ -9,6 +9,14 @@ An app for monitoring, recording, and documenting noise pollution to present evi
 <img width="672" height="449" alt="image" src="https://github.com/user-attachments/assets/1aec8be2-3b0e-4c67-8a7b-dc6f8a29e07e" />
 
 
+## Android app
+
+Turn an old Android phone or Fire tablet (Android 4.4+) into a noise recorder that uploads to Hugging Face.
+
+**[Download it here](https://github.com/DrewThomasson/sound-monitor/releases/latest)**
+
+<img width="512" alt="Android app" src="android-recorder/store/screenshot-1-status.png" />
+
 ## Example datasets
 
 Real data collected with these tools on a residential street in Atlanta, published on Hugging Face:
@@ -20,7 +28,7 @@ Real data collected with these tools on a residential street in Atlanta, publish
 
 ## Other tools in this repo
 
-- **[`android-recorder/`](android-recorder/)**: an Android app (Fire tablets and Android phones or tablets, Android 4.4+, so even old phones from a drawer work) that records loud events around the clock and uploads them to a Hugging Face dataset on a schedule. **[Download the latest version](https://github.com/DrewThomasson/sound-monitor/releases/latest)** and install it on your tablet ([privacy policy](docs/privacy-policy.md)).
+- **[`android-recorder/`](android-recorder/)**: source code of the Android app above.
 - **[`analysis/`](analysis/)**: scripts that label each event as revving / vehicle / siren / horn / other with an AudioSet model, so emergency vehicles can be excluded, and build the charts, summary and review pages.
 
 ## GUI
