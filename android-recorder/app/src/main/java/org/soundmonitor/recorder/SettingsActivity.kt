@@ -47,8 +47,25 @@ class SettingsActivity : Activity() {
         val signedDec = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
 
         header("Site and upload")
-        site = field("Site name (used as the folder name in the dataset)", prefs.site, "porch-5th-floor")
-        repo = field("Hugging Face dataset", prefs.repo, "user/dataset-name")
+        root.addView(TextView(this).apply {
+            text = "Uploads go to a Hugging Face dataset in your account (free). Create the dataset, then a token " +
+                "with write access to it, and paste both below."
+            alpha = 0.75f
+        })
+        val links = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun link(label: String, url: String) = links.addView(Button(this).apply {
+            text = label
+            setOnClickListener {
+                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+                catch (_: Exception) { result.text = "Open $url in a browser" }
+            }
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        link("Create account", "https://huggingface.co/join")
+        link("Create dataset", "https://huggingface.co/new-dataset")
+        link("Create token", "https://huggingface.co/settings/tokens")
+        root.addView(links)
+        site = field("Site name (used as the folder name in the dataset)", prefs.site, "my-street")
+        repo = field("Hugging Face dataset (your-username/dataset-name)", prefs.repo, "your-username/street-noise")
         token = field("Hugging Face token (needs write access)", prefs.token, "hf_…",
             InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         times = field("Upload times (24-hour, comma separated)", prefs.uploadTimes, "07:00,19:00")
@@ -105,9 +122,9 @@ class SettingsActivity : Activity() {
 
     private fun save() {
         val problems = mutableListOf<String>()
-        prefs.site = site.text.toString().trim().ifEmpty { "porch-5th-floor" }
+        prefs.site = site.text.toString().trim().ifEmpty { "my-street" }
         val r = repo.text.toString().trim()
-        if (Regex("^[\\w.-]+/[\\w.-]+$").matches(r)) prefs.repo = r else problems += "Dataset should look like user/name"
+        if (r.isEmpty() || Regex("^[\\w.-]+/[\\w.-]+$").matches(r)) prefs.repo = r else problems += "Dataset should look like your-username/dataset-name"
         prefs.token = token.text.toString().trim()
         val t = times.text.toString().trim()
         prefs.uploadTimes = t

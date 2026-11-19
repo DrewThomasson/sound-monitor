@@ -99,10 +99,12 @@ class MainActivity : Activity() {
         super.onResume()
         saveRotation()
         ui.post(refresher)
+        if (!prefs.introSeen && intro?.isShowing != true) showIntro()
         // Recording itself starts in onWindowFocusChanged, once this screen is really visible.
         if (!hasPermissions()) askPermissions()
         // "adb shell am start -n org.soundmonitor.recorder/.MainActivity -a test_event" saves a test clip.
-        if (intent?.action == RecorderService.ACTION_TEST_EVENT) {
+        val debuggable = applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (debuggable && intent?.action == RecorderService.ACTION_TEST_EVENT) {
             intent.action = null
             ui.postDelayed({ RecorderService.instance?.testEvent() }, 500)
         }
@@ -197,6 +199,30 @@ class MainActivity : Activity() {
         return ScrollView(this).apply { addView(root) }
     }
 
+    private var intro: android.app.AlertDialog? = null
+
+    /** First-run explanation, including the reminder about local recording laws. */
+    private fun showIntro() {
+        intro = android.app.AlertDialog.Builder(this)
+            .setTitle("Welcome to Street Noise Recorder")
+            .setMessage(
+                "This app turns a spare tablet into a round-the-clock street noise monitor.\n\n" +
+                "• It listens all the time and saves a short video with sound of every loud event, such as cars revving.\n" +
+                "• It logs the sound level every second.\n" +
+                "• Twice a day it uploads everything to a Hugging Face dataset in your own account, so you can build evidence for your city.\n\n" +
+                "To upload, you'll need a free Hugging Face account, a dataset and a write token. Settings has links for each.\n\n" +
+                "Please point the camera at the street, not into homes or private spaces, and check your local laws: " +
+                "some places restrict recording conversations or people without their consent. You're responsible for how you use this app."
+            )
+            .setPositiveButton("Open settings") { _, _ ->
+                prefs.introSeen = true
+                startActivity(Intent(this, SettingsActivity::class.java))
+            }
+            .setNegativeButton("Later") { _, _ -> prefs.introSeen = true }
+            .setCancelable(false)
+            .show()
+    }
+
     private fun toggle() {
         if (Status.running) {
             stopService(Intent(this, RecorderService::class.java))
@@ -239,7 +265,8 @@ class MainActivity : Activity() {
                 append("Camera: ${Status.cameraText}\n")
                 if (Status.batteryText.isNotEmpty()) append("Battery: ${Status.batteryText}\n")
                 if (running) append("Running since: ${time.format(Date(Status.startedAtMs))}\n")
-                if (prefs.token.isBlank()) append("\nAdd your Hugging Face token in Settings so uploads can work.")
+                if (prefs.repo.isBlank() || prefs.token.isBlank())
+                    append("\nRecordings are kept on this tablet until you add a Hugging Face dataset and token in Settings.")
             }
             ui.postDelayed(this, 500)
         }

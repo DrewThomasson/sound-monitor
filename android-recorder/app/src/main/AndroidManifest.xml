@@ -20,7 +20,7 @@
     <application
         android:allowBackup="false"
         android:label="@string/app_name"
-        android:icon="@android:drawable/ic_btn_speak_now"
+        android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.DeviceDefault"
         android:usesCleartextTraffic="false">
 
