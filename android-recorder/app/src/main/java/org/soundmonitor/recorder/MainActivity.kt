@@ -210,6 +210,8 @@ class MainActivity : Activity() {
                 "• It listens all the time and saves a short video with sound of every loud event, such as cars revving.\n" +
                 "• It logs the sound level every second.\n" +
                 "• Twice a day it uploads everything to a Hugging Face dataset in your own account, so you can build evidence for your city.\n\n" +
+                "When Android asks for the microphone and camera, choose \"While using the app\", not \"Only this time\": " +
+                "one-time permissions are taken back after a while and recording stops.\n\n" +
                 "To upload, you'll need a free Hugging Face account, a dataset and a write token. Settings has links for each.\n\n" +
                 "Please point the camera at the street, not into homes or private spaces, and check your local laws: " +
                 "some places restrict recording conversations or people without their consent. You're responsible for how you use this app."

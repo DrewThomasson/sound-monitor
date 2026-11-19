@@ -74,6 +74,7 @@ class RecorderService : Service() {
             ACTION_TEST_EVENT -> { if (Status.running) testEvent(); return START_STICKY }
         }
         if (Status.running) return START_STICKY
+        if (!micAllowed()) { notifyMicMissing(); stopSelf(); return START_NOT_STICKY }
         goForeground()
         startEverything()
         return START_STICKY
@@ -109,7 +110,40 @@ class RecorderService : Service() {
             .build()
     }
 
+    private fun micAllowed(): Boolean = Build.VERSION.SDK_INT < 23 ||
+        checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    /** Android can take the mic permission back (for example a one-time grant); say so instead of stopping silently. */
+    private fun notifyMicMissing() {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(NotificationChannel(ALERT_CHANNEL, "Problems", NotificationManager.IMPORTANCE_HIGH))
+        }
+        val pi = PendingIntent.getActivity(
+            this, 2, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or (if (Build.VERSION.SDK_INT >= 23) PendingIntent.FLAG_IMMUTABLE else 0)
+        )
+        @Suppress("DEPRECATION")
+        val b = if (Build.VERSION.SDK_INT >= 26) Notification.Builder(this, ALERT_CHANNEL) else Notification.Builder(this)
+        nm.notify(ALERT_ID, b.setContentTitle("Recording stopped")
+            .setContentText("Microphone permission was removed. Tap to fix.")
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setAutoCancel(true)
+            .setContentIntent(pi)
+            .build())
+    }
+
+    /** Day logs left as .part (the app wasn't running at midnight) are finished so they upload. */
+    private fun finishOldLevelFiles() {
+        val today = hourFmt.format(Date())
+        File(outbox, "sites/${prefs.siteSlug}/levels").listFiles()?.forEach {
+            if (it.name.endsWith(".csv.part") && !it.name.startsWith(today)) finishLevelFile(it)
+        }
+    }
+
     private fun startEverything() {
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(ALERT_ID)
+        try { finishOldLevelFiles() } catch (e: Exception) { Log.w(TAG, "level cleanup failed", e) }
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "streetnoise:recorder").apply {
             setReferenceCounted(false); acquire()
@@ -141,7 +175,8 @@ class RecorderService : Service() {
         synchronized(this) {
             try { levelWriter?.close() } catch (_: Exception) {}
             levelWriter = null
-            levelFile?.let { finishLevelFile(it) }
+            // Today's log stays .part and is appended to if recording restarts today; finishing it here
+            // would let a second file with the same name overwrite it in the dataset.
             levelFile = null; levelHourKey = ""
         }
         wakeLock?.release(); wakeLock = null
@@ -344,6 +379,8 @@ class RecorderService : Service() {
         private const val TAG = "RecorderService"
         private const val CHANNEL = "recording"
         private const val NOTIF_ID = 1
+        private const val ALERT_CHANNEL = "alerts"
+        private const val ALERT_ID = 3
         const val ACTION_STOP = "stop"
         const val ACTION_UPLOAD = "upload"
         const val ACTION_TEST_EVENT = "test_event"

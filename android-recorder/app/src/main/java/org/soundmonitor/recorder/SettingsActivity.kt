@@ -41,7 +41,7 @@ class SettingsActivity : Activity() {
         })
         fun field(label: String, value: String, hint: String = "", type: Int = InputType.TYPE_CLASS_TEXT): EditText {
             root.addView(TextView(this).apply { text = label; alpha = 0.75f; setPadding(0, dp(8), 0, 0) })
-            return EditText(this).apply { setText(value); this.hint = hint; inputType = type; setSingleLine() }.also { root.addView(it) }
+            return EditText(this).apply { setSingleLine(); setText(value); this.hint = hint; inputType = type }.also { root.addView(it) }
         }
         val num = InputType.TYPE_CLASS_NUMBER
         val signedDec = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED

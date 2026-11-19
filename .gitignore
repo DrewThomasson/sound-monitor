@@ -56,3 +56,5 @@ analysis/.venv/
 analysis/hf_cache/
 analysis/*.log
 analysis/hf_card/analysis/examples/
+analysis/porch_review/
+analysis/sites/
