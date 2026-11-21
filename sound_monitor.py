@@ -233,6 +233,74 @@ class AudioProcessor(QObject):
         self.video_event_filename = None
         return filename
     
+    def merge_audio_video(self, audio_file, video_file):
+        """Merge audio and video files using FFmpeg"""
+        if not audio_file or not video_file:
+            return video_file
+        
+        if not os.path.exists(audio_file) or not os.path.exists(video_file):
+            return video_file
+        
+        try:
+            import subprocess
+            
+            # Create output filename (replace silent video)
+            output_file = video_file.replace('.mp4', '_temp.mp4')
+            
+            # Use FFmpeg to merge audio and video
+            # -i: input files
+            # -c:v copy: copy video codec (no re-encoding)
+            # -c:a aac: encode audio to AAC (compatible with MP4)
+            # -shortest: finish encoding when shortest stream ends
+            # -y: overwrite output file
+            cmd = [
+                'ffmpeg', '-y',
+                '-i', video_file,  # Video input
+                '-i', audio_file,   # Audio input
+                '-c:v', 'copy',     # Copy video stream
+                '-c:a', 'aac',      # Encode audio as AAC
+                '-shortest',        # Use shortest stream duration
+                output_file
+            ]
+            
+            # Run FFmpeg silently
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=30
+            )
+            
+            if result.returncode == 0 and os.path.exists(output_file):
+                # Success - replace original video file with merged version
+                try:
+                    os.remove(video_file)
+                    os.rename(output_file, video_file)
+                    self.status_updated.emit(f"Video merged with audio: {video_file}")
+                    return video_file
+                except Exception as e:
+                    self.error_occurred.emit(f"Error replacing video file: {str(e)}")
+                    # Clean up temp file if rename failed
+                    if os.path.exists(output_file):
+                        os.remove(output_file)
+                    return video_file
+            else:
+                # FFmpeg failed - keep silent video
+                self.error_occurred.emit(f"FFmpeg merge failed (video will be silent)")
+                if os.path.exists(output_file):
+                    os.remove(output_file)
+                return video_file
+                
+        except subprocess.TimeoutExpired:
+            self.error_occurred.emit("FFmpeg timeout - video will be silent")
+            return video_file
+        except FileNotFoundError:
+            self.error_occurred.emit("FFmpeg not found - install it to enable audio in videos")
+            return video_file
+        except Exception as e:
+            self.error_occurred.emit(f"Error merging audio/video: {str(e)}")
+            return video_file
+    
     def detect_sample_rate(self, device_index):
         """Detect the best supported sample rate for a device"""
         if not PYAUDIO_AVAILABLE:
@@ -566,6 +634,10 @@ class AudioProcessor(QObject):
         # Save event audio
         timestamp = self.event_start_time.strftime("%Y%m%d_%H%M%S_%f")
         filename = self.save_audio_segment(event_audio, f"event_{timestamp}")
+        
+        # Merge audio into video if both exist
+        if filename and video_filename:
+            video_filename = self.merge_audio_video(filename, video_filename)
         
         # Log event
         if filename:

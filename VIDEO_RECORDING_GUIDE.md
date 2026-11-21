@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Sound Monitor application now supports **event-based video recording** to provide visual context alongside audio evidence for noise pollution documentation.
+The Sound Monitor application now supports **event-based video recording with audio** to provide complete audiovisual evidence for noise pollution documentation.
 
 ## Key Features
 
@@ -12,23 +12,39 @@ The Sound Monitor application now supports **event-based video recording** to pr
 - Automatically starts when noise exceeds threshold
 - Continues during entire loud event
 - Stops when noise returns to normal
+- **Video includes synchronized audio** - complete evidence in one file
 
 ### Storage Optimization
 - **Resolution:** 640x480 (VGA) - balance between quality and size
 - **Frame Rate:** 10 FPS - sufficient for evidence, minimal storage
-- **Codec:** MP4V - widely compatible
+- **Codec:** MP4V (video) + AAC (audio) - widely compatible
 - **Approximate Size:** 5-10 MB per minute of event video
 - **Example:** 70GB storage = hundreds of event videos
 
 ### Integration
-- Synchronized with audio events
-- Both audio and video saved for each loud event
+- Synchronized audio and video captured for each loud event
+- Audio is automatically merged into video files using FFmpeg
+- Both standalone audio MP3 files and combined video files are saved
 - Live camera preview in the GUI
-- Video playback from event log table
+- Video playback from event log table includes audio
 
 ## Setup Instructions
 
-### 1. Install OpenCV
+### 1. Install Dependencies
+
+**FFmpeg (Required for audio in videos):**
+```bash
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# macOS
+brew install ffmpeg
+
+# Windows
+# Download from https://ffmpeg.org/download.html
+```
+
+**OpenCV (Required for video recording):**
 ```bash
 pip install opencv-python
 ```
@@ -48,6 +64,10 @@ pip install opencv-python
 ### 4. Test It Out
 1. Go to **Live Monitoring** tab
 2. See the live camera preview (if enabled)
+3. Make a loud noise (above threshold)
+4. Video will start recording automatically with audio
+5. When noise stops, video+audio saves automatically
+6. Double-click the video in the Event Log to play it with audio
 3. Make a loud noise (above threshold)
 4. Video will start recording automatically
 5. When noise stops, video saves automatically
@@ -70,7 +90,9 @@ pip install opencv-python
 - Stored in `videos/` directory
 - Named: `event_YYYYMMDD_HHMMSS_ffffff.mp4`
 - Matches corresponding audio file naming
-- Can be played with any standard video player
+- **Contains both video and audio tracks** - complete evidence in one file
+- Can be played with any standard video player (VLC, Windows Media Player, etc.)
+- Audio is synchronized with video automatically
 
 ## Technical Details
 
@@ -78,9 +100,11 @@ pip install opencv-python
 ```
 Resolution: 640x480 pixels
 Frame Rate: 10 FPS
-Codec: MP4V
+Video Codec: MP4V
+Audio Codec: AAC (merged from event audio)
 Format: .mp4
 Bitrate: Variable (optimized)
+Audio Quality: 64kbps MP3 (converted to AAC in video)
 ```
 
 ### Storage Calculations
@@ -156,12 +180,38 @@ pip install opencv-python
 # Then restart the application
 ```
 
+### "FFmpeg not found" Warning
+```
+# Video will be recorded without audio
+# To add audio to videos, install FFmpeg:
+
+# Ubuntu/Debian
+sudo apt-get install ffmpeg
+
+# macOS
+brew install ffmpeg
+
+# Windows
+# Download from https://ffmpeg.org/download.html
+# Then restart the application
+```
+
 ### Video Not Recording
 ```
 1. Check "Enable Video Recording" is checked
 2. Verify camera is selected
 3. Ensure noise exceeds threshold
 4. Check videos/ directory permissions
+5. Verify FFmpeg is installed (for audio in videos)
+```
+
+### Video Has No Audio
+```
+1. Ensure FFmpeg is installed: ffmpeg -version
+2. Check status bar for "FFmpeg not found" message
+3. Install FFmpeg (see installation instructions above)
+4. Restart the application
+5. Previous videos won't have audio retroactively added
 ```
 
 ### Video Won't Play
@@ -222,6 +272,9 @@ pip install opencv-python
 **Q: Does video record continuously?**
 A: No! Only during loud events (above threshold). This saves storage and respects privacy.
 
+**Q: Do videos include audio?**
+A: Yes! As of the latest version, videos automatically include the synchronized audio from the event. Both the standalone MP3 file and the video with audio are saved.
+
 **Q: How much storage do videos use?**
 A: ~5-10 MB per minute of event video. If you have 10 events per day averaging 1 minute each, that's only 50-100 MB/day.
 
@@ -232,7 +285,10 @@ A: Yes! Built-in laptop webcams and USB webcams both work.
 A: The app works perfectly with audio-only mode. Video is completely optional.
 
 **Q: Can I record video without audio?**
-A: No, video is tied to audio events. Video only records when loud sound is detected.
+A: No, video is tied to audio events. Video only records when loud sound is detected, and the audio is automatically included in the video file.
+
+**Q: What if FFmpeg is not installed?**
+A: Videos will still be recorded but without audio tracks. Install FFmpeg to enable audio in future video recordings.
 
 **Q: How do I disable video?**
 A: Uncheck "Enable Video Recording" in the Settings tab.
@@ -241,10 +297,10 @@ A: Uncheck "Enable Video Recording" in the Settings tab.
 A: In the `videos/` folder next to the `recordings/` folder.
 
 **Q: What format are the videos?**
-A: Standard MP4 files that play in any media player.
+A: Standard MP4 files with AAC audio that play in any media player.
 
 **Q: Does video recording impact audio quality?**
-A: No, audio recording is independent and unchanged.
+A: No, audio recording is independent and unchanged. Both the original MP3 and the video with audio are saved.
 
 **Q: Can I change video quality?**
 A: Advanced users can edit VIDEO_WIDTH, VIDEO_HEIGHT, and VIDEO_FPS constants in the code.
@@ -259,4 +315,4 @@ For issues or questions:
 
 ---
 
-**Remember:** Video recording is optional but provides valuable visual evidence for documenting noise pollution. Use responsibly and in compliance with local laws.
+**Remember:** Video recording with audio provides complete audiovisual evidence for documenting noise pollution. FFmpeg is required to merge audio into video files. Use responsibly and in compliance with local laws.
